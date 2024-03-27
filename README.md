@@ -1,2 +1,3 @@
-# miniengine
-The last engine to make.
+# Mini
+The Mini Mono repo for the Mini Engine.
+
