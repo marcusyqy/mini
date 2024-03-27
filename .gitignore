@@ -30,3 +30,18 @@
 *.exe
 *.out
 *.app
+*.pdb
+*.ilk
+*.ilk
+*.ini
+
+# visual studio
+.vs
+*.sln
+
+# radebugger
+*.raddbg
+
+**/build/*
+**/lib/*
+
