@@ -9,8 +9,8 @@ TARGET=DEBUG
 COMMON_FLAGS="-g -std=c++17 -Wall -Werror -Wpedantic" # -Wsign-conversion"
 DEBUG_FLAGS="-O0 -D_DEBUG"
 RELEASE_FLAGS="-O2"
-INCLUDE_FLAGS="-I../deps/imgui/imgui -I../deps/glfw/include -I../deps/minigraph -I../deps/glfw/deps -IX11"
-LINK_FLAGS="-L$VULKAN_SDK/lib ../deps/glfw/build/glfw.a ../deps/imgui/build/imgui.a ../extra/adapter/build/adapter.a -lGL -lX11 -ldl -pthread -lvulkan-1 -lshaderc_shared"
+INCLUDE_FLAGS="-I../extra/imgui/imgui -I../extra/glfw/include -I../extra/minigraph -IX11"
+LINK_FLAGS="-L$VULKAN_SDK/lib ../extra/glfw/build/glfw.a ../extra/imgui/build/imgui.a ../extra/adapter/build/adapter.a -lGL -lX11 -ldl -pthread -lvulkan-1 -lshaderc_shared"
 
 # declare variables
 debug=0
@@ -21,7 +21,7 @@ imgui=0
 main=0
 all=0
 run=0
-extra=0
+adapter=0
 
 if [ -z "$*" ]; then
     echo NO ARGUMENTS. DEFAULTING TO BUILD ALL.
@@ -53,25 +53,26 @@ if [ "$all" -eq "1" ]; then
     eval "imgui=1"
     eval "main=1"
     eval "glfw=1"
-    eval "extra=1"
+    eval "adapter=1"
 fi
 
 if [ "$glfw" -eq "1" ]; then
     echo "BUILD glfw"
-    sh "deps/glfw/build.sh" "$@"
+    sh "extra/glfw/build.sh" "$@"
 fi
 
 if [ "$imgui" -eq "1" ]; then
     echo "BUILD IMGUI"
-    sh "deps/imgui/build.sh" "$@"
+    sh "extra/imgui/build.sh" "$@"
 fi
 
-if [ "$extra" -eq "1" ]; then
-    echo "BUILD EXTRA"
+if [ "$adapter" -eq "1" ]; then
+    echo "BUILD ADAPTER"
     sh "extra/adapter/build.sh" "$@"
 fi
 
 
+# TODO:
 cd build
 if [ "$main" -eq "1" ]; then
     echo "BUILD MINI"

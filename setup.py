@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import os
-import sys
 from extra.install.vulkan import Vulkan
 
-includes = [ "mini", "deps/imgui/imgui", "deps/glfw/include", "extra/adapter" ]
+includes = [ "mini", "extra/imgui/imgui", "extra/glfw/include", "extra/adapter" ]
 
 def download_vulkan_if_not_available():
   # TODO: Download vulkan.
@@ -22,6 +21,7 @@ def process_win32_env(str):
   return ret
 
 def generate_compile_commands():
+  print("Generating compile_flags.txt...")
   compile_flags=""
   for i in range(0, len(includes)):
     compile_flags += "-I" + includes[i] + "\n"

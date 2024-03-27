@@ -22,7 +22,7 @@ echo COMPILER:$COMPILER
 COMMON_FLAGS="-g"
 DEBUG_FLAGS="-O0 -D_DEBUG"
 RELEASE_FLAGS="-O2"
-INCLUDE_FLAGS="-I../../../deps/imgui/imgui -I../../../deps/glfw/include"
+INCLUDE_FLAGS="-I../../imgui/imgui -I../../glfw/include"
 
 if [ "$release" -eq "1" ]; then
    echo "Release enabled"

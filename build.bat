@@ -15,6 +15,8 @@ if "%all%" == "1" (
     set main=1
 )
 
+if "%setup%"=="1" echo [SETTING UP] && call python3 setup.py
+
 set forward_flags=
 if "%debug%"=="1"   set forward_flags=debug
 if "%release%"=="1"   set forward_flags=release
@@ -22,20 +24,20 @@ if "%release%"=="1"   set forward_flags=release
 :: build glfw
 set build_glfw=
 if "%glfw%"=="1" set build_glfw= call build %forward_flags% && echo [BUILDING GLFW]
-pushd deps\glfw
+pushd extra\glfw
 call %build_glfw%
 popd
 
 :: build imgui
 set build_imgui=
 if "%imgui%"=="1" set build_imgui= call build %forward_flags% && echo [BUILDING IMGUI]
-pushd deps\imgui
+pushd extra\imgui
 %build_imgui%
 popd
 
-:: build extra
-set build_extra=
-if "%extra%"=="1" set build_extra= call build %forward_flags% && echo [BUILDING EXTRAS]
+:: build adapter
+set build_adapter=
+if "%adapter%"=="1" set build_adapter= call build %forward_flags% && echo [BUILDING ADAPTER]
 pushd extra\adapter
 %build_extra%
 popd
@@ -58,15 +60,15 @@ set debug_links="shaderc_sharedd.lib"
 set release_links="shaderc_shared.lib"
 
 set compile_flags=
-set include_deps= /I..\deps\imgui\imgui /I..\deps\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include
+set include_deps= /I..\extra\imgui\imgui /I..\extra\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include
 set common_flags= %include_deps% /I..\mini\ /nologo /MP /FC /Zi /Zc:__cplusplus /std:c++17 /wd4530 /utf-8
 
 
 if "%debug%"=="1" set compile_flags= %debug_flags% %common_flags%
 if "%release%"=="1" set compile_flags= %release_flags% %common_flags%
 
-set glfw_link= ..\deps\glfw\build\glfw.lib
-set imgui_link= ..\deps\imgui\build\imgui.lib
+set glfw_link= ..\extra\glfw\build\glfw.lib
+set imgui_link= ..\extra\imgui\build\imgui.lib
 set adapters_link= ..\extra\adapter\build\adapter.lib
 
 set common_links= /link /LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% vulkan-1.lib

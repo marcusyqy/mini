@@ -11,7 +11,7 @@ set debug_flags= /Od /D_DEBUG /MTd
 set release_flags= /O2 /DNDEBUG /MT
 
 set compile_flags=
-set common_flags= /I..\..\..\deps\imgui\imgui /I..\..\..\deps\glfw\include -I%VULKAN_SDK%\Include /nologo /MP /FC /Zi /D_GLFW_WIN32
+set common_flags= /I..\..\imgui\imgui /I..\..\glfw\include -I%VULKAN_SDK%\Include /nologo /MP /FC /Zi /D_GLFW_WIN32
 
 set link_flags= /IGNORE:4006
 if "%debug%"=="1" set compile_flags= %debug_flags% %common_flags%
