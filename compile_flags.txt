@@ -1,6 +1,0 @@
--Iminiengine
--Ideps\imgui\imgui
--Ideps\glfw\include
--Ideps\extra\adapter
--I$VULKAN_SDK\Include
--std=c++17
