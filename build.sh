@@ -10,7 +10,7 @@ COMMON_FLAGS="-g -std=c++17 -Wall -Werror -Wpedantic" # -Wsign-conversion"
 DEBUG_FLAGS="-O0 -D_DEBUG"
 RELEASE_FLAGS="-O2"
 INCLUDE_FLAGS="-I../deps/imgui/imgui -I../deps/glfw/include -I../deps/minigraph -I../deps/glfw/deps -IX11"
-LINK_FLAGS="-L$VULKAN_SDK/lib ../deps/glfw/lib/glfw.a ../deps/imgui/lib/imgui.a -lGL -lX11 -ldl -pthread -lvulkan-1 -lshaderc_shared"
+LINK_FLAGS="-L$VULKAN_SDK/lib ../deps/glfw/build/glfw.a ../deps/imgui/build/imgui.a ../extra/adapter/build/adapter.a -lGL -lX11 -ldl -pthread -lvulkan-1 -lshaderc_shared"
 
 # declare variables
 debug=0
@@ -23,7 +23,7 @@ all=0
 run=0
 extra=0
 
-if [ -z "$*" ]; then 
+if [ -z "$*" ]; then
     echo NO ARGUMENTS. DEFAULTING TO BUILD ALL.
     all=1
 fi
@@ -53,6 +53,7 @@ if [ "$all" -eq "1" ]; then
     eval "imgui=1"
     eval "main=1"
     eval "glfw=1"
+    eval "extra=1"
 fi
 
 if [ "$glfw" -eq "1" ]; then

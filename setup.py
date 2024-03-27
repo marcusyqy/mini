@@ -1,12 +1,15 @@
+#!/bin/python3
 import os
 import sys
+from extra.install.vulkan import Vulkan
 
 includes = [ "mini", "deps/imgui/imgui", "deps/glfw/include", "extra/adapter" ]
 
 def download_vulkan_if_not_available():
   # TODO: Download vulkan.
-  assert os.environ.__contains__("VULKAN_SDK"), "Does not contain Vulkan SDK & don't have logic to download it yet"
-  pass
+  vulkan = Vulkan()
+  if not vulkan.check_installed():
+    vulkan.install()
 
 def process_win32_env(str):
   arr = str.split("\\")

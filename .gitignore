@@ -45,4 +45,7 @@
 **/build/*
 **/lib/*
 
+# python byte code
+*.pyc
+
 compile_flags.txt
