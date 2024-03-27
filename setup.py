@@ -3,6 +3,11 @@ import sys
 
 includes = [ "mini", "deps/imgui/imgui", "deps/glfw/include", "extra/adapter" ]
 
+def download_vulkan_if_not_available():
+  # TODO: Download vulkan.
+  assert os.environ.__contains__("VULKAN_SDK"), "Does not contain Vulkan SDK & don't have logic to download it yet"
+  pass
+
 def process_win32_env(str):
   arr = str.split("\\")
   ret=""
@@ -18,8 +23,9 @@ def generate_compile_commands():
   for i in range(0, len(includes)):
     compile_flags += "-I" + includes[i] + "\n"
 
-  assert os.environ.__contains__("VULKAN_SDK"), "Does not contain Vulkan SDK"
+  download_vulkan_if_not_available()
   compile_flags += "-I" + process_win32_env(os.environ["VULKAN_SDK"]) + "/Include\n"
+
   compile_flags += "-std=c++17"
   f = open("compile_flags.txt", "w")
   f.write(compile_flags)
