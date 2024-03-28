@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 
-class Vulkan:
+class Vulkan_Installer:
   def check_installed(self):
     return os.environ.__contains__("VULKAN_SDK")
   def install(self):
@@ -9,6 +9,6 @@ class Vulkan:
     pass
 
 if __name__ == "__main__":
-  vulkan = Vulkan()
+  vulkan = Vulkan_Installer()
   if not vulkan.check_installed():
     vulkan.install()

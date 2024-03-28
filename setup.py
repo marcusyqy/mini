@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import os
-from extra.install.vulkan import Vulkan
+from extra import Vulkan_Installer
 
-includes = [ "mini", "extra/imgui/imgui", "extra/glfw/include", "extra/adapter" ]
+includes = [ "mini", "extra/imgui/imgui", "extra/glfw/include", "extra/adapter", "extra/volk" ]
 
 def download_vulkan_if_not_available():
   # TODO: Download vulkan.
-  vulkan = Vulkan()
+  vulkan = Vulkan_Installer()
   if not vulkan.check_installed():
     vulkan.install()
 
@@ -26,7 +26,7 @@ def generate_compile_commands():
   for i in range(0, len(includes)):
     compile_flags += "-I" + includes[i] + "\n"
 
-  download_vulkan_if_not_available()
+  assert os.environ.__contains__("VULKAN_SDK"), "Vulkan SDK needs to be downloaded since this project relies on it."
   compile_flags += "-I" + process_win32_env(os.environ["VULKAN_SDK"]) + "/Include\n"
 
   compile_flags += "-std=c++17"
@@ -34,4 +34,5 @@ def generate_compile_commands():
   f.write(compile_flags)
 
 if __name__ == "__main__":
+  download_vulkan_if_not_available()
   generate_compile_commands()
