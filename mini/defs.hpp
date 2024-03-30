@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <utility>
 
-
 using f32 = float;
 using f64 = double;
 

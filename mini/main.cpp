@@ -25,11 +25,14 @@ int main(int, char**) {
 
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) return 1;
+  defer { glfwTerminate();  };
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
   constexpr auto window_name = "Place holder window name";
   GLFWwindow* window         = glfwCreateWindow(1280, 720, window_name, nullptr, nullptr);
+  defer { glfwDestroyWindow(window); };
+
   if (!glfwVulkanSupported()) {
     log_error("GLFW: Vulkan not supported");
     return 1;
@@ -38,6 +41,7 @@ int main(int, char**) {
   u32 extension_count     = {};
   const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
   auto vk_vars            = draw::setup_vulkan(extensions, extension_count);
+  defer { draw::cleanup_vulkan(); };
 
   return 0;
 }

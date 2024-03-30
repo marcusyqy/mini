@@ -19,6 +19,8 @@ namespace draw {
 namespace vk_constants {
 constexpr auto api_version                  = VK_API_VERSION_1_3;
 constexpr const char* validation_layer      = "VK_LAYER_KHRONOS_validation";
+
+// we need to compare with this.
 constexpr const char* required_extensions[] = {
   "VK_KHR_surface",
 #ifdef WIN32
@@ -85,6 +87,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_report(
 
 static VkAllocationCallbacks* allocator_callback = nullptr;
 static VkInstance instance                       = VK_NULL_HANDLE;
+static VkDebugUtilsMessengerEXT debug_messenger  = VK_NULL_HANDLE;
 static VkPhysicalDevice physical_device          = VK_NULL_HANDLE;
 static VkDevice device                           = VK_NULL_HANDLE;
 static uint32_t queue_family                     = (uint32_t)-1;
@@ -147,7 +150,7 @@ Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensi
     vk_check(vkEnumerateInstanceExtensionProperties(nullptr, &properties_count, properties));
 
     // Enable required extensions
-    auto instance_extensions = arena.push_array_no_init<const char*>(instance_extensions_count + 3);
+    auto instance_extensions = arena.push_array_no_init<const char*>(instance_extensions_count + 4);
     // first memcpy everything
     memcpy(&instance_extensions, &instance_extensions_glfw, sizeof(const char*) * instance_extensions_count);
 
@@ -155,26 +158,49 @@ Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensi
       instance_extensions[instance_extensions_count++] = VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
 #ifdef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
     if (is_extensions_available(properties, properties_count, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)) {
-      instance_extensions[instance_extensions_count++] =VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+      instance_extensions[instance_extensions_count++] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
       create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     }
 #endif
 
     // Enabling validation layers
-    const char* layers[]            = { "VK_LAYER_KHRONOS_validation" };
-    create_info.enabledLayerCount   = 1;
-    create_info.ppEnabledLayerNames = layers;
-    instance_extensions[instance_extensions_count++] ="VK_EXT_debug_report";
+    const char* layers[]                             = { "VK_LAYER_KHRONOS_validation" };
+    create_info.enabledLayerCount                    = 1;
+    create_info.ppEnabledLayerNames                  = layers;
+
+#if VK_ENABLE_VALIDATION
+    instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+    instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+#endif 
 
     // Create Vulkan Instance
     create_info.enabledExtensionCount   = instance_extensions_count;
     create_info.ppEnabledExtensionNames = instance_extensions;
     vk_check(vkCreateInstance(&create_info, allocator_callback, &instance));
 
+#if VK_ENABLE_VALIDATION
+    VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = {};
+    {
+      debug_messenger_create_info.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+      debug_messenger_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+          VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+          VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+      debug_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+      debug_messenger_create_info.pfnUserCallback = vk_callbacks::debug_callback;
+      debug_messenger_create_info.pUserData       = nullptr; // Optional
+    }
+
+    auto vkCreateDebugUtilsMessengerEXT =
+        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    assert(vkCreateDebugUtilsMessengerEXT);
+
+    vk_check(vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, nullptr, &debug_messenger));
+
     // Setup the debug report callback
     auto vkCreateDebugReportCallbackEXT =
         (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-    assert(vkCreateDebugReportCallbackEXT != nullptr);
+    assert(vkCreateDebugReportCallbackEXT);
 
     VkDebugReportCallbackCreateInfoEXT debug_report_ci = {};
     debug_report_ci.sType                              = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
@@ -183,6 +209,7 @@ Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensi
     debug_report_ci.pfnCallback = vk_callbacks::debug_report;
     debug_report_ci.pUserData   = nullptr;
     vk_check(vkCreateDebugReportCallbackEXT(instance, &debug_report_ci, allocator_callback, &debug_report));
+#endif
 
     arena.clear();
   }
@@ -190,6 +217,21 @@ Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensi
   log_info("nothing happened that made us crash");
 
   return {};
+}
+
+void cleanup_vulkan() {
+#if VK_ENABLE_VALIDATION
+  auto vkDestroyDebugUtilsMessengerEXT =
+      (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+  assert(vkDestroyDebugUtilsMessengerEXT);
+  vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, allocator_callback);
+
+  auto vkDestroyDebugReportCallbackEXT =
+      (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+  assert(vkDestroyDebugReportCallbackEXT);
+  vkDestroyDebugReportCallbackEXT(instance, debug_report, allocator_callback);
+#endif
+  vkDestroyInstance(instance, allocator_callback);
 }
 
 } // namespace draw
