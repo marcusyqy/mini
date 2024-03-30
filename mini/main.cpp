@@ -11,10 +11,10 @@
 #define GLFW_INCLUDE_VULKAN
 
 #include "constant/roboto.font"
-#include <GLFW/glfw3.h>
-#include <vulkan/vulkan.h>
 #include "draw.hpp"
 #include "log.hpp"
+#include <GLFW/glfw3.h>
+#include <vulkan/vulkan.h>
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
@@ -37,8 +37,7 @@ int main(int, char**) {
 
   u32 extension_count     = {};
   const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
-  auto vk_vars = draw::setup_vulkan(extensions, extension_count);
-
+  auto vk_vars            = draw::setup_vulkan(extensions, extension_count);
 
   return 0;
 }
