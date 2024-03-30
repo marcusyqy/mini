@@ -19,7 +19,7 @@ const char* to_level_string(Log_Level level) {
 } // namespace helper
 
 // temporary implementation until we can do a better job.
-void console_log(Log_Level level, const char* message, ...) {
+void console_log_print_line(Log_Level level, const char* message, ...) {
   va_list list;
   va_start(list, message);
   int value = vsnprintf(helper::buffer, sizeof(helper::buffer), message, list);
