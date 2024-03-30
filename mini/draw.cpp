@@ -1,4 +1,5 @@
 #include "draw.hpp"
+#include "log.hpp"
 
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
@@ -29,26 +30,21 @@ static VkDescriptorPool descriptor_pool      = VK_NULL_HANDLE;
 namespace callbacks {
 static void check_vk_result(VkResult err) {
   if (err == 0) return;
-  fprintf(stderr, "[vulkan] Error: VkResult = %d\n", err);
+  log_error("[vulkan] Error: VkResult = %d", err);
   assert(err < 0);
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_report(
-    VkDebugReportFlagsEXT flags,
+    VkDebugReportFlagsEXT, // flags
     VkDebugReportObjectTypeEXT object_type,
-    uint64_t object,
-    size_t location,
-    int32_t message_code,
-    const char* player_prefix,
+    uint64_t,    // object
+    size_t,      // location
+    int32_t,     // message_code
+    const char*, // player_prefix
     const char* message,
-    void* user_data) {
-  (void)flags;
-  (void)object;
-  (void)location;
-  (void)message_code;
-  (void)user_data;
-  (void)player_prefix; // Unused arguments
-  fprintf(stderr, "[vulkan] Debug report from ObjectType: %i\nMessage: %s\n\n", object_type, message);
+    void*) // user_data
+{
+  log_error("[vulkan] Debug report from ObjectType: %i\nMessage: %s\n", object_type, message);
   return VK_FALSE;
 }
 
