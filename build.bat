@@ -71,7 +71,8 @@ set glfw_link= ..\extra\glfw\build\glfw.lib
 set imgui_link= ..\extra\imgui\build\imgui.lib
 set adapters_link= ..\extra\adapter\build\adapter.lib
 
-set common_links= /link /LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% vulkan-1.lib
+set win32_link=gdi32.lib kernel32.lib user32.lib Shell32.lib
+set common_links= /link /LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% vulkan-1.lib 
 
 set links=
 if "%debug%"=="1" set links= %common_links% %debug_links% 
