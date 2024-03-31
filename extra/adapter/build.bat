@@ -21,7 +21,6 @@ set links= gdi32.lib shell32.lib
 
 if not exist build mkdir build
 pushd build
-echo cl %compile_flags% -c ..\*.cpp 
 call cl %compile_flags% -c ..\*.cpp 
 call lib %links% *.obj %link_flags% /OUT:adapter.lib
 popd

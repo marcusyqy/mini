@@ -1,6 +1,8 @@
 #pragma once
 #include "defs.hpp"
 #include "mem.hpp"
+#define GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
 

@@ -11,7 +11,7 @@ if "%~1"==""        echo [default mode] && set all=1
 if "%all%" == "1" (
     set glfw=1
     set imgui=1
-    set extra=1
+    set adapter=1
     set main=1
 )
 
@@ -39,7 +39,7 @@ popd
 set build_adapter=
 if "%adapter%"=="1" set build_adapter= call build %forward_flags% && echo [BUILDING ADAPTER]
 pushd extra\adapter
-%build_extra%
+%build_adapter%
 popd
 
 set FILEMASK=*.c,*.cc,*.cpp,*.h,*.hh,*.hpp
