@@ -17,8 +17,8 @@
 namespace draw {
 
 namespace vk_constants {
-constexpr auto api_version                  = VK_API_VERSION_1_3;
-constexpr const char* validation_layer      = "VK_LAYER_KHRONOS_validation";
+constexpr auto api_version             = VK_API_VERSION_1_3;
+constexpr const char* validation_layer = "VK_LAYER_KHRONOS_validation";
 
 // we need to compare with this.
 constexpr const char* required_extensions[] = {
@@ -85,6 +85,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_report(
 
 } // namespace vk_callbacks
 
+// globals
 static VkAllocationCallbacks* allocator_callback = nullptr;
 static VkInstance instance                       = VK_NULL_HANDLE;
 static VkDebugUtilsMessengerEXT debug_messenger  = VK_NULL_HANDLE;
@@ -95,7 +96,7 @@ static VkQueue queue                             = VK_NULL_HANDLE;
 static VkDebugReportCallbackEXT debug_report     = VK_NULL_HANDLE;
 static VkPipelineCache pipeline_cache            = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool          = VK_NULL_HANDLE;
-static Stack_Allocator<1 << 15> arena            = {};
+static Vk_Stack_Allocator arena                  = {};
 
 static bool
     is_extensions_available(const VkExtensionProperties* properties, u32 properties_count, const char* extension) {
@@ -106,7 +107,7 @@ static bool
   return false;
 }
 
-Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions_count) {
+void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions_count) {
   VkApplicationInfo app_info  = {};
   app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext              = nullptr;
@@ -164,14 +165,14 @@ Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensi
 #endif
 
     // Enabling validation layers
-    const char* layers[]                             = { "VK_LAYER_KHRONOS_validation" };
-    create_info.enabledLayerCount                    = 1;
-    create_info.ppEnabledLayerNames                  = layers;
+    const char* layers[]            = { "VK_LAYER_KHRONOS_validation" };
+    create_info.enabledLayerCount   = 1;
+    create_info.ppEnabledLayerNames = layers;
 
 #if VK_ENABLE_VALIDATION
     instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
     instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
-#endif 
+#endif
 
     // Create Vulkan Instance
     create_info.enabledExtensionCount   = instance_extensions_count;
@@ -214,12 +215,149 @@ Vk_Vars setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensi
     arena.clear();
   }
 
-  log_info("nothing happened that made us crash");
+  // select physical device.
+  {
+    u32 gpu_count = 0;
+    vk_check(vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr));
+    assert(gpu_count > 0);
+    auto gpus = arena.push_array_no_init<VkPhysicalDevice>(gpu_count);
+    vk_check(vkEnumeratePhysicalDevices(instance, &gpu_count, gpus));
 
-  return {};
+    for (u32 i = 0; i < gpu_count; ++i) {
+      // should save stack here. or create a temporary scratch arena. not sure...
+      // @TODO: revisit this.
+      VkPhysicalDeviceProperties properties;
+      vkGetPhysicalDeviceProperties(gpus[i], &properties);
+      VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_parameters_feature = {};
+      shader_draw_parameters_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
+      shader_draw_parameters_feature.pNext = nullptr;
+      shader_draw_parameters_feature.shaderDrawParameters = VK_TRUE;
+
+      VkPhysicalDeviceFeatures2 features = {};
+      features.sType                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+      features.pNext                     = &shader_draw_parameters_feature;
+      vkGetPhysicalDeviceFeatures2(gpus[i], &features);
+
+      if (shader_draw_parameters_feature.shaderDrawParameters != VK_TRUE) continue;
+      if (features.features.geometryShader != VK_TRUE) continue;
+
+      u32 extension_count = 0;
+      vkEnumerateDeviceExtensionProperties(gpus[i], nullptr, &extension_count, nullptr);
+      assert(extension_count > 0);
+      VkExtensionProperties* available_extensions = arena.push_array_no_init<VkExtensionProperties>(extension_count);
+      vkEnumerateDeviceExtensionProperties(gpus[i], nullptr, &extension_count, available_extensions);
+      u32 j = 0;
+      for (; j < extension_count; ++j) {
+        auto& props = available_extensions[j];
+        if (!strcmp(props.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME)) break;
+      }
+
+      // did not find
+      if (j == extension_count) continue;
+
+      // queue family index
+      u32 probable_queue_fam = (u32)-1;
+      {
+        u32 count = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
+        assert(count > 0);
+        auto queues = arena.push_array_no_init<VkQueueFamilyProperties>(count);
+        vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, queues);
+        for (u32 i = 0; i < count; ++i) {
+          if (queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+              glfwGetPhysicalDevicePresentationSupport(instance, physical_device, i) == VK_TRUE) {
+            probable_queue_fam = i;
+            assert(queues[i].queueFlags & VK_QUEUE_TRANSFER_BIT);
+            break;
+          }
+        }
+
+        if (probable_queue_fam == (u32)-1) {
+          continue;
+        }
+      }
+
+      if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+        physical_device = gpus[i];
+        queue_family    = probable_queue_fam;
+        break;
+      }
+    }
+
+    // nothing was selected
+    if (physical_device == VK_NULL_HANDLE) {
+      physical_device = gpus[0];
+      u32 count       = 0;
+      vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
+      assert(count > 0);
+      auto queues = arena.push_array_no_init<VkQueueFamilyProperties>(count);
+      vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, queues);
+      for (u32 i = 0; i < count; ++i) {
+        if (queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+            glfwGetPhysicalDevicePresentationSupport(instance, physical_device, i) == VK_TRUE) {
+          queue_family = i;
+          assert(queues[i].queueFlags & VK_QUEUE_TRANSFER_BIT);
+          break;
+        }
+      }
+      assert(queue_family == (u32)-1);
+    }
+    arena.clear();
+  }
+
+  // create a device
+  {
+    const char** device_extentions = arena.push_array_no_init<const char*>(2);
+    u32 device_extensions_count    = 0;
+    device_extentions[device_extensions_count++] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+    u32 extension_count            = 0;
+    vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, nullptr);
+    assert(extension_count > 0);
+    VkExtensionProperties* available_extensions = arena.push_array_no_init<VkExtensionProperties>(extension_count);
+    vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, available_extensions);
+#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+    if (is_extensions_available(available_extensions, extension_count, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME))
+      device_extensions[device_extensions_count++] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
+#endif
+    const float queue_priority = 1.0f;
+    VkDeviceQueueCreateInfo queue_info = {};
+    queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_info.queueFamilyIndex = queue_family;
+    queue_info.queueCount = 1;
+    queue_info.pQueuePriorities = &queue_priority;
+
+    VkDeviceCreateInfo create_info = {};
+    create_info.sType =VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    create_info.queueCreateInfoCount = 1;
+    create_info.pQueueCreateInfos = &queue_info;
+    create_info.enabledExtensionCount = device_extensions_count;
+    create_info.ppEnabledExtensionNames = device_extentions;
+    vk_check(vkCreateDevice(physical_device, &create_info, allocator_callback, &device));
+    arena.clear();
+  }
+
+  // Create Descriptor Pool
+  // The example only requires a single combined image sampler descriptor for the font image and only uses one
+  // descriptor set (for that) If you wish to load e.g. additional textures you may need to alter pools sizes.
+  {
+    VkDescriptorPoolSize pool_sizes[] = {
+      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 },
+    };
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets                    = 1;
+    pool_info.poolSizeCount              = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.pPoolSizes                 = pool_sizes;
+    vk_check(vkCreateDescriptorPool(device, &pool_info, allocator_callback, &descriptor_pool));
+  }
+
+  log_info("nothing happened that made us crash");
 }
 
 void cleanup_vulkan() {
+  vkDestroyDescriptorPool(device, descriptor_pool, allocator_callback);
+  vkDestroyDevice(device, allocator_callback);
 #if VK_ENABLE_VALIDATION
   auto vkDestroyDebugUtilsMessengerEXT =
       (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -232,6 +370,13 @@ void cleanup_vulkan() {
   vkDestroyDebugReportCallbackEXT(instance, debug_report, allocator_callback);
 #endif
   vkDestroyInstance(instance, allocator_callback);
+}
+
+Window create_surface(GLFWwindow* window) {
+  // Create Window Surface
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
+  return {};
 }
 
 } // namespace draw

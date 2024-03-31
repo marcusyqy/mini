@@ -40,8 +40,11 @@ int main(int, char**) {
 
   u32 extension_count     = {};
   const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
-  auto vk_vars            = draw::setup_vulkan(extensions, extension_count);
+
+  draw::setup_vulkan(extensions, extension_count);
   defer { draw::cleanup_vulkan(); };
+
+
 
   return 0;
 }
