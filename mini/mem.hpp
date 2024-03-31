@@ -128,8 +128,11 @@ struct Stack_Allocator {
 
     *node = (Stack_Node*)alloc_proc.allocate(sizeof(Stack_Node), alignof(Stack_Node));
     assert(*node);
-    auto& n  = *node;
+    auto& n = *node;
+    // should i consider memsetting?
     n->stack.current = 0; // need to reset in the event that allocate doesn't memset.
+    n->next          = nullptr;
+
     auto buf = (uintptr_t)n->stack.buffer;
     auto p   = buf + (uintptr_t)n->stack.current;
     auto a   = (uintptr_t)alignment;

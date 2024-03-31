@@ -6,7 +6,7 @@
 namespace helper {
 char buffer[1024];
 
-const char* to_level_string(Log_Level level) {
+static const char* to_level_string(Log_Level level) {
   switch (level) {
     case Log_Level::info: return "INFO";
     case Log_Level::warn: return "WARN";

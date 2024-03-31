@@ -4,6 +4,12 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#undef max
+#include <vulkan/vulkan_win32.h>
+#endif
+
 // for imgui
 #include "imgui_impl_vulkan.h"
 
@@ -39,6 +45,15 @@ static void vk_check(VkResult err) {
   assert(err < 0);
 }
 
+VkBool32 vk_get_physical_device_present_support(VkInstance instance, VkPhysicalDevice physical_device, u32 index) {
+#if defined(_WIN32)
+  (void)instance;
+  return vkGetPhysicalDeviceWin32PresentationSupportKHR(physical_device, index);
+#else
+  static_assert(false, "Other platforms other than windows not supported currently.");
+#endif
+}
+
 namespace vk_callbacks {
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
@@ -56,7 +71,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     prepend = "GENERAL";
   }
 
-  static constexpr char validation_message[] = "<{}> :|vulkan|: {}";
+  static constexpr char validation_message[] = "<%s> :|vulkan|: %s";
   if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
     log_error(validation_message, prepend, callback_data->pMessage);
   } else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
@@ -188,14 +203,13 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
       debug_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-      debug_messenger_create_info.pfnUserCallback = vk_callbacks::debug_callback;
+      debug_messenger_create_info.pfnUserCallback = &vk_callbacks::debug_callback;
       debug_messenger_create_info.pUserData       = nullptr; // Optional
     }
 
     auto vkCreateDebugUtilsMessengerEXT =
         (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     assert(vkCreateDebugUtilsMessengerEXT);
-
     vk_check(vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, nullptr, &debug_messenger));
 
     // Setup the debug report callback
@@ -259,15 +273,15 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
       u32 probable_queue_fam = (u32)-1;
       {
         u32 count = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
+        vkGetPhysicalDeviceQueueFamilyProperties(gpus[i], &count, nullptr);
         assert(count > 0);
         auto queues = arena.push_array_no_init<VkQueueFamilyProperties>(count);
-        vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, queues);
-        for (u32 i = 0; i < count; ++i) {
-          if (queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-              glfwGetPhysicalDevicePresentationSupport(instance, physical_device, i) == VK_TRUE) {
-            probable_queue_fam = i;
-            assert(queues[i].queueFlags & VK_QUEUE_TRANSFER_BIT);
+        vkGetPhysicalDeviceQueueFamilyProperties(gpus[i], &count, queues);
+        for (u32 j = 0; j < count; ++j) {
+          if ((queues[j].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+              vk_get_physical_device_present_support(instance, gpus[i], j) == VK_TRUE) {
+            probable_queue_fam = j;
+            assert(queues[j].queueFlags & VK_QUEUE_TRANSFER_BIT);
             break;
           }
         }
@@ -294,7 +308,7 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
       vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, queues);
       for (u32 i = 0; i < count; ++i) {
         if (queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-            glfwGetPhysicalDevicePresentationSupport(instance, physical_device, i) == VK_TRUE) {
+            vk_get_physical_device_present_support(instance, physical_device, i) == VK_TRUE) {
           queue_family = i;
           assert(queues[i].queueFlags & VK_QUEUE_TRANSFER_BIT);
           break;
@@ -307,10 +321,10 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
 
   // create a device
   {
-    const char** device_extentions = arena.push_array_no_init<const char*>(2);
-    u32 device_extensions_count    = 0;
+    const char** device_extentions               = arena.push_array_no_init<const char*>(2);
+    u32 device_extensions_count                  = 0;
     device_extentions[device_extensions_count++] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-    u32 extension_count            = 0;
+    u32 extension_count                          = 0;
     vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, nullptr);
     assert(extension_count > 0);
     VkExtensionProperties* available_extensions = arena.push_array_no_init<VkExtensionProperties>(extension_count);
@@ -319,18 +333,18 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
     if (is_extensions_available(available_extensions, extension_count, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME))
       device_extensions[device_extensions_count++] = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
 #endif
-    const float queue_priority = 1.0f;
+    const float queue_priority         = 1.0f;
     VkDeviceQueueCreateInfo queue_info = {};
-    queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_info.queueFamilyIndex = queue_family;
-    queue_info.queueCount = 1;
-    queue_info.pQueuePriorities = &queue_priority;
+    queue_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_info.queueFamilyIndex        = queue_family;
+    queue_info.queueCount              = 1;
+    queue_info.pQueuePriorities        = &queue_priority;
 
-    VkDeviceCreateInfo create_info = {};
-    create_info.sType =VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    create_info.queueCreateInfoCount = 1;
-    create_info.pQueueCreateInfos = &queue_info;
-    create_info.enabledExtensionCount = device_extensions_count;
+    VkDeviceCreateInfo create_info      = {};
+    create_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    create_info.queueCreateInfoCount    = 1;
+    create_info.pQueueCreateInfos       = &queue_info;
+    create_info.enabledExtensionCount   = device_extensions_count;
     create_info.ppEnabledExtensionNames = device_extentions;
     vk_check(vkCreateDevice(physical_device, &create_info, allocator_callback, &device));
     arena.clear();
@@ -347,12 +361,10 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
     pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     pool_info.maxSets                    = 1;
-    pool_info.poolSizeCount              = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.poolSizeCount              = 1;
     pool_info.pPoolSizes                 = pool_sizes;
     vk_check(vkCreateDescriptorPool(device, &pool_info, allocator_callback, &descriptor_pool));
   }
-
-  log_info("nothing happened that made us crash");
 }
 
 void cleanup_vulkan() {

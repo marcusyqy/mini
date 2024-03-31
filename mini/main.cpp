@@ -25,7 +25,7 @@ int main(int, char**) {
 
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) return 1;
-  defer { glfwTerminate();  };
+  defer { glfwTerminate(); };
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
@@ -43,8 +43,6 @@ int main(int, char**) {
 
   draw::setup_vulkan(extensions, extension_count);
   defer { draw::cleanup_vulkan(); };
-
-
 
   return 0;
 }
