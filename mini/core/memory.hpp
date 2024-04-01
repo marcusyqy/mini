@@ -79,21 +79,44 @@ struct Destructor_Node {
 
 } // namespace detail
 
+enum struct Allocation_Instruction {
+  alloc, resize, free
+};
+
 struct Allocator_Proc {
-  void* (*_allocate)(void* allocator, u32 size, u32 alignment) = +[](void*, u32 size, u32 alignment) -> void* {
-    return ::malloc(size);
+  void* (*_alloc_proc)(
+    Allocation_Instruction alloc_instruction,
+    void* allocator, void* memory, u32 size, u32 alignment) = 
+    +[](Allocation_Instruction alloc_instruction,
+    void* allocator, void* memory, u32 size, u32 alignment) -> void* {
+      switch(alloc_instruction) {
+        case Allocation_Instruction::alloc:
+          return ::malloc(size);
+        case Allocation_Instruction::free:
+          ::free(memory);
+          return nullptr;
+        case Allocation_Instruction::resize:
+          return ::realloc(memory, size);
+      }
+      assert(false);
+      return nullptr;
   };
   void (*_free)(void* allocator, void* memory) = +[](void*, void* memory) { ::free(memory); };
   void* _allocator                             = nullptr;
 
   void* allocate(u32 size, u32 alignment) {
-    assert(_allocate);
-    return _allocate(_allocator, size, alignment);
+    assert(_alloc_proc);
+    return _alloc_proc(Allocation_Instruction::alloc, _allocator, nullptr, size, alignment);
   }
 
   void free(void* memory) {
-    assert(_free);
-    _free(_allocator, memory);
+    assert(_alloc_proc);
+    _alloc_proc(Allocation_Instruction::free, _allocator, memory, 0, 0);
+  }
+
+  void* realloc(void* memory, u32 size, u32 alignment) {
+    assert(_alloc_proc);
+    _alloc_proc(Allocation_Instruction::free, _allocator, memory, size, alignment);
   }
 };
 

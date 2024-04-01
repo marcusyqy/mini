@@ -22,7 +22,7 @@
 #include "log.hpp"
 
 // std libs
-#include "mem.hpp"
+#include "core/memory.hpp"
 #include <cassert>
 #include <cstdio>
 
@@ -507,7 +507,7 @@ void new_frame(const Window& window) {
     int width, height;
     glfwGetFramebufferSize(window.window, &width, &height);
     if (width > 0 && height > 0) {
-      ImGui_ImplVulkan_SetMinImageCount(vk_state::swapchain_rebuild);
+      ImGui_ImplVulkan_SetMinImageCount(swapchain_min_image_count);
       ImGui_ImplVulkanH_CreateOrResizeWindow(
           instance,
           physical_device,
