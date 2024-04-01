@@ -8,7 +8,7 @@ struct Relative_Pointer {
 private:
   static_assert(std::is_signed_v<T>, "T must be signed");
   enum Value : T {};
-  static constexpr auto bit_mask   = 1 << (sizeof(uint32_t) * 8 - 1); // make the most high bit 1.
+  static constexpr auto bit_mask   = 1 << (sizeof(T) * 8 - 1); // make the most high bit 1.
   static constexpr auto Null_Value = Value(0);
 
   Value offset;

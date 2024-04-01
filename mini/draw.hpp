@@ -13,8 +13,8 @@ void setup_vulkan(const char** extensions, u32 count);
 void cleanup_vulkan();
 
 struct Window {
-  GLFWwindow* window;
-  VkSurfaceKHR surface;
+  GLFWwindow* window = nullptr;
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
 };
 
 // this will be used as the main window.
