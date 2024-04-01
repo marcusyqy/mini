@@ -3,7 +3,6 @@
 // @TODO: remove this. (just use this for now).
 #include "imgui_impl_vulkan.h"
 
-#define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -183,7 +182,7 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
     // Enable required extensions
     auto instance_extensions = arena.push_array_no_init<const char*>(instance_extensions_count + 4);
     // first memcpy everything
-    memcpy(&instance_extensions, &instance_extensions_glfw, sizeof(const char*) * instance_extensions_count);
+    memcpy(instance_extensions, instance_extensions_glfw, sizeof(const char*) * instance_extensions_count);
 
     if (is_extensions_available(properties, properties_count, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME))
       instance_extensions[instance_extensions_count++] = VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME;
@@ -415,9 +414,9 @@ Window create_surface(GLFWwindow* window) {
   create_info.hinstance = NULL;
   create_info.hwnd = glfwGetWin32Window(window);
 
-  vk_check(vkCreateWin32SurfaceKHR(instance, &create_info, allocator_callback, &surface));
+  // vk_check(vkCreateWin32SurfaceKHR(instance, &create_info, allocator_callback, &surface));
   // can't make glfw work lol.
-  // vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
+  vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
 
   // Create Framebuffers
   int width, height;
