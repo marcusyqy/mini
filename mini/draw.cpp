@@ -6,17 +6,17 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
+// #define GLFW_EXPOSE_NATIVE_WIN32
+// #include <GLFW/glfw3native.h>
 
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
-#if defined(_WIN32)
-#include <windows.h>
-#undef max
-#include <vulkan/vulkan_win32.h>
-#endif
+// #if defined(_WIN32)
+// #include <windows.h>
+// #undef max
+// #include <vulkan/vulkan_win32.h>
+// #endif
 
 #include "draw.hpp"
 #include "log.hpp"
@@ -54,12 +54,13 @@ static void vk_check(VkResult err) {
 }
 
 VkBool32 vk_get_physical_device_present_support(VkInstance instance, VkPhysicalDevice physical_device, u32 index) {
-#if defined(_WIN32)
-  (void)instance;
-  return vkGetPhysicalDeviceWin32PresentationSupportKHR(physical_device, index);
-#else
-  static_assert(false, "Other platforms other than windows not supported currently.");
-#endif
+  return glfwGetPhysicalDevicePresentationSupport(instance, physical_device, index);
+// #if defined(_WIN32)
+//   (void)instance;
+//   return vkGetPhysicalDeviceWin32PresentationSupportKHR(physical_device, index);
+// #else
+//   static_assert(false, "Other platforms other than windows not supported currently.");
+// #endif
 }
 
 namespace vk_callbacks {
@@ -408,14 +409,14 @@ Window create_surface(GLFWwindow* window) {
   // Create Window Surface
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   log_debug("made it here maybe");
-  VkWin32SurfaceCreateInfoKHR create_info {};
-  create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-  create_info.pNext = nullptr;
-  create_info.hinstance = NULL;
-  create_info.hwnd = glfwGetWin32Window(window);
 
+  // VkWin32SurfaceCreateInfoKHR create_info {};
+  // create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+  // create_info.pNext = nullptr;
+  // create_info.hinstance = NULL;
+  // create_info.hwnd = glfwGetWin32Window(window);
   // vk_check(vkCreateWin32SurfaceKHR(instance, &create_info, allocator_callback, &surface));
-  // can't make glfw work lol.
+
   vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
 
   // Create Framebuffers
