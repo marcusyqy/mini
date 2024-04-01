@@ -1,5 +1,14 @@
-#include "draw.hpp"
-#include "log.hpp"
+
+// for imgui
+// @TODO: remove this. (just use this for now).
+#include "imgui_impl_vulkan.h"
+
+#define GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
@@ -10,9 +19,8 @@
 #include <vulkan/vulkan_win32.h>
 #endif
 
-// for imgui 
-// @TODO: remove this. (just use this for now).
-#include "imgui_impl_vulkan.h"
+#include "draw.hpp"
+#include "log.hpp"
 
 // std libs
 #include "mem.hpp"
@@ -113,6 +121,12 @@ static VkDebugReportCallbackEXT debug_report     = VK_NULL_HANDLE;
 static VkPipelineCache pipeline_cache            = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool          = VK_NULL_HANDLE;
 static Vk_Arena arena                            = {};
+
+constexpr static int swapchain_min_image_count = 2;
+
+namespace vk_state {
+static bool swapchain_rebuild = false;
+}
 
 static bool
     is_extensions_available(const VkExtensionProperties* properties, u32 properties_count, const char* extension) {
@@ -348,6 +362,7 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
     create_info.enabledExtensionCount   = device_extensions_count;
     create_info.ppEnabledExtensionNames = device_extentions;
     vk_check(vkCreateDevice(physical_device, &create_info, allocator_callback, &device));
+    vkGetDeviceQueue(device, queue_family, 0, &queue);
     arena.clear();
   }
 
@@ -386,19 +401,29 @@ void cleanup_vulkan() {
 }
 
 namespace to_remove {
-ImGui_ImplVulkanH_Window main_window_imgui_impl;
+ImGui_ImplVulkanH_Window main_window_imgui_impl = {};
 }
 
 // I think you are only able to create one here because we need to manage people's expectations.
 Window create_surface(GLFWwindow* window) {
   // Create Window Surface
   VkSurfaceKHR surface = VK_NULL_HANDLE;
-  vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
+  log_debug("made it here maybe");
+  VkWin32SurfaceCreateInfoKHR create_info {};
+  create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+  create_info.pNext = nullptr;
+  create_info.hinstance = NULL;
+  create_info.hwnd = glfwGetWin32Window(window);
+
+  vk_check(vkCreateWin32SurfaceKHR(instance, &create_info, allocator_callback, &surface));
+  // can't make glfw work lol.
+  // vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
 
   // Create Framebuffers
-  int w, h;
-  glfwGetFramebufferSize(window, &w, &h);
+  int width, height;
+  glfwGetFramebufferSize(window, &width, &height);
   ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
+  log_debug("made it here maybe");
   // SetupVulkanWindow(wd, surface, w, h);
   wd->Surface = surface;
 
@@ -407,9 +432,210 @@ Window create_surface(GLFWwindow* window) {
   vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, queue_family, wd->Surface, &res);
   assert(res == VK_TRUE);
 
-  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  log_debug("made it here maybe");
+  // Select Surface Format
+  const VkFormat requestSurfaceImageFormat[]     = { VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_FORMAT_R8G8B8A8_UNORM,
+                                                     VK_FORMAT_B8G8R8_UNORM,
+                                                     VK_FORMAT_R8G8B8_UNORM };
+  const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+  wd->SurfaceFormat                              = ImGui_ImplVulkanH_SelectSurfaceFormat(
+      physical_device,
+      wd->Surface,
+      requestSurfaceImageFormat,
+      (size_t)IM_ARRAYSIZE(requestSurfaceImageFormat),
+      requestSurfaceColorSpace);
 
-  return { window, surface, swapchain };
+  log_debug("made it here maybe");
+  // Select Present Mode
+#ifdef APP_USE_UNLIMITED_FRAME_RATE
+  VkPresentModeKHR present_modes[] = { VK_PRESENT_MODE_MAILBOX_KHR,
+                                       VK_PRESENT_MODE_IMMEDIATE_KHR,
+                                       VK_PRESENT_MODE_FIFO_KHR };
+#else
+  VkPresentModeKHR present_modes[] = { VK_PRESENT_MODE_FIFO_KHR };
+#endif
+  wd->PresentMode =
+      ImGui_ImplVulkanH_SelectPresentMode(physical_device, wd->Surface, &present_modes[0], IM_ARRAYSIZE(present_modes));
+  // printf("[vulkan] Selected PresentMode = %d\n", wd->PresentMode);
+
+  // Create SwapChain, RenderPass, Framebuffer, etc.
+  IM_ASSERT(swapchain_min_image_count >= 2);
+  ImGui_ImplVulkanH_CreateOrResizeWindow(
+      instance,
+      physical_device,
+      device,
+      wd,
+      queue_family,
+      allocator_callback,
+      width,
+      height,
+      swapchain_min_image_count);
+
+  // Setup Platform/Renderer backends
+  ImGui_ImplVulkan_InitInfo init_info = {};
+  init_info.Instance                  = instance;
+  init_info.PhysicalDevice            = physical_device;
+  init_info.Device                    = device;
+  init_info.QueueFamily               = queue_family;
+  init_info.Queue                     = queue;
+  init_info.PipelineCache             = pipeline_cache;
+  init_info.DescriptorPool            = descriptor_pool;
+  init_info.RenderPass                = wd->RenderPass;
+  init_info.Subpass                   = 0;
+  init_info.MinImageCount             = swapchain_min_image_count;
+  init_info.ImageCount                = wd->ImageCount;
+  init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+  init_info.Allocator                 = allocator_callback;
+  init_info.CheckVkResultFn           = vk_check;
+  ImGui_ImplVulkan_Init(&init_info);
+
+  return { window, surface };
+}
+
+void destroy_surface(Window& window) {
+  assert(to_remove::main_window_imgui_impl.Surface == window.surface);
+
+  vk_check(vkDeviceWaitIdle(device));
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplVulkanH_DestroyWindow(instance, device, &to_remove::main_window_imgui_impl, allocator_callback);
+}
+
+void new_frame(const Window& window) {
+  assert(to_remove::main_window_imgui_impl.Surface == window.surface);
+  if (vk_state::swapchain_rebuild) {
+    int width, height;
+    glfwGetFramebufferSize(window.window, &width, &height);
+    if (width > 0 && height > 0) {
+      ImGui_ImplVulkan_SetMinImageCount(vk_state::swapchain_rebuild);
+      ImGui_ImplVulkanH_CreateOrResizeWindow(
+          instance,
+          physical_device,
+          device,
+          &to_remove::main_window_imgui_impl,
+          queue_family,
+          allocator_callback,
+          width,
+          height,
+          swapchain_min_image_count);
+      to_remove::main_window_imgui_impl.FrameIndex = 0;
+      vk_state::swapchain_rebuild                  = false;
+    }
+  }
+  // Start the Dear ImGui frame
+  ImGui_ImplVulkan_NewFrame();
+}
+
+void present_frame(const Window& window) {
+  assert(to_remove::main_window_imgui_impl.Surface == window.surface);
+  if (vk_state::swapchain_rebuild) return;
+
+  ImGui_ImplVulkanH_Window* wd          = &to_remove::main_window_imgui_impl;
+  VkSemaphore render_complete_semaphore = wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
+  VkPresentInfoKHR info                 = {};
+  info.sType                            = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  info.waitSemaphoreCount               = 1;
+  info.pWaitSemaphores                  = &render_complete_semaphore;
+  info.swapchainCount                   = 1;
+  info.pSwapchains                      = &wd->Swapchain;
+  info.pImageIndices                    = &wd->FrameIndex;
+  VkResult err                          = vkQueuePresentKHR(queue, &info);
+  if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR) {
+    vk_state::swapchain_rebuild = true;
+    return;
+  }
+  vk_check(err);
+  wd->SemaphoreIndex = (wd->SemaphoreIndex + 1) % wd->SemaphoreCount; // Now we can use the next set of semaphores
+}
+
+void set_clear_color(const Window& window, float x, float y, float z, float w) {
+  assert(to_remove::main_window_imgui_impl.Surface == window.surface);
+  ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
+  wd->ClearValue.color.float32[0] = x;
+  wd->ClearValue.color.float32[1] = y;
+  wd->ClearValue.color.float32[2] = z;
+  wd->ClearValue.color.float32[3] = w;
+}
+
+// TO_REMOVE
+void render_frame(const Window& window, ImDrawData* draw_data) {
+  assert(to_remove::main_window_imgui_impl.Surface == window.surface);
+  ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
+  VkResult err;
+
+  VkSemaphore image_acquired_semaphore  = wd->FrameSemaphores[wd->SemaphoreIndex].ImageAcquiredSemaphore;
+  VkSemaphore render_complete_semaphore = wd->FrameSemaphores[wd->SemaphoreIndex].RenderCompleteSemaphore;
+
+  err = vkAcquireNextImageKHR(
+      device,
+      wd->Swapchain,
+      UINT64_MAX,
+      image_acquired_semaphore,
+      VK_NULL_HANDLE,
+      &wd->FrameIndex);
+
+  if (err == VK_ERROR_OUT_OF_DATE_KHR || err == VK_SUBOPTIMAL_KHR) {
+    vk_state::swapchain_rebuild = true;
+    return;
+  }
+  vk_check(err);
+
+  ImGui_ImplVulkanH_Frame* fd = &wd->Frames[wd->FrameIndex];
+  {
+    err = vkWaitForFences(
+        device,
+        1,
+        &fd->Fence,
+        VK_TRUE,
+        UINT64_MAX); // wait indefinitely instead of periodically checking
+    vk_check(err);
+
+    err = vkResetFences(device, 1, &fd->Fence);
+    vk_check(err);
+  }
+  {
+    err = vkResetCommandPool(device, fd->CommandPool, 0);
+    vk_check(err);
+    VkCommandBufferBeginInfo info = {};
+    info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    err = vkBeginCommandBuffer(fd->CommandBuffer, &info);
+    vk_check(err);
+  }
+  {
+    VkRenderPassBeginInfo info    = {};
+    info.sType                    = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    info.renderPass               = wd->RenderPass;
+    info.framebuffer              = fd->Framebuffer;
+    info.renderArea.extent.width  = wd->Width;
+    info.renderArea.extent.height = wd->Height;
+    info.clearValueCount          = 1;
+    info.pClearValues             = &wd->ClearValue;
+    vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+  }
+
+  // Record dear imgui primitives into command buffer
+  ImGui_ImplVulkan_RenderDrawData(draw_data, fd->CommandBuffer);
+
+  // Submit command buffer
+  vkCmdEndRenderPass(fd->CommandBuffer);
+  {
+    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo info               = {};
+    info.sType                      = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    info.waitSemaphoreCount         = 1;
+    info.pWaitSemaphores            = &image_acquired_semaphore;
+    info.pWaitDstStageMask          = &wait_stage;
+    info.commandBufferCount         = 1;
+    info.pCommandBuffers            = &fd->CommandBuffer;
+    info.signalSemaphoreCount       = 1;
+    info.pSignalSemaphores          = &render_complete_semaphore;
+
+    err = vkEndCommandBuffer(fd->CommandBuffer);
+    vk_check(err);
+    err = vkQueueSubmit(queue, 1, &info, fd->Fence);
+    vk_check(err);
+  }
 }
 
 } // namespace draw
