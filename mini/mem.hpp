@@ -97,15 +97,14 @@ struct Allocator_Proc {
   }
 };
 
-template <u32 Stack_Size>
-struct Stack_Allocator {
-  static_assert(is_power_of_two(Stack_Size), "Stack pages must be in power of two.");
-  static constexpr u32 page_size = Stack_Size;
+template <u32 page_size>
+struct Linear_Allocator {
+  static_assert(is_power_of_two(page_size), "Stack pages must be in power of two.");
 
   // this needs to be specific for T
   u8* push(u32 size, u32 alignment) {
     assert(is_power_of_two(alignment));
-    Stack_Node** node = &head;
+    Node** node = &head;
 
     // go through all the pages.
     while (*node) {
@@ -126,7 +125,7 @@ struct Stack_Allocator {
       node = &n->next;
     }
 
-    *node = (Stack_Node*)alloc_proc.allocate(sizeof(Stack_Node), alignof(Stack_Node));
+    *node = (Node*)alloc_proc.allocate(sizeof(Node), alignof(Node));
     assert(*node);
     auto& n = *node;
     // should i consider memsetting?
@@ -219,31 +218,31 @@ struct Stack_Allocator {
     }
   }
 
-  Stack_Allocator()                                        = default;
-  Stack_Allocator(const Stack_Allocator& o)                = delete;
-  Stack_Allocator& operator=(const Stack_Allocator& o)     = delete;
-  Stack_Allocator(Stack_Allocator&& o) noexcept            = delete;
-  Stack_Allocator& operator=(Stack_Allocator&& o) noexcept = delete;
+  Linear_Allocator()                                        = default;
+  Linear_Allocator(const Linear_Allocator& o)                = delete;
+  Linear_Allocator& operator=(const Linear_Allocator& o)     = delete;
+  Linear_Allocator(Linear_Allocator&& o) noexcept            = delete;
+  Linear_Allocator& operator=(Linear_Allocator&& o) noexcept = delete;
 
-  ~Stack_Allocator() { free(); }
+  ~Linear_Allocator() { free(); }
 
-  Stack_Allocator(Allocator_Proc _alloc_proc) : alloc_proc(_alloc_proc) {}
+  Linear_Allocator(Allocator_Proc _alloc_proc) : alloc_proc(_alloc_proc) {}
 
 private:
-  struct Stack {
-    u8 buffer[Stack_Size];
+  struct Page {
+    u8 buffer[page_size];
     u32 current = {};
   };
 
-  struct Stack_Node {
-    Stack stack;
-    Stack_Node* next = nullptr;
+  struct Node {
+    Page stack;
+    Node* next = nullptr;
   };
 
 private:
-  Stack_Node* head                         = nullptr;
+  Node* head                         = nullptr;
   detail::Destructor_Node* destructor_list = nullptr;
   Allocator_Proc alloc_proc                = {};
 };
 
-using Default_Stack_Allocator = Stack_Allocator<1u << 16>;
+using Default_Linear_Allocator = Linear_Allocator<1u << 16>;

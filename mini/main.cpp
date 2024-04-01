@@ -43,6 +43,10 @@ int main(int, char**) {
 
   draw::setup_vulkan(extensions, extension_count);
   defer { draw::cleanup_vulkan(); };
+  log_info("info");
+  log_error("error");
+  log_debug("debug");
+  log_warn("warn");
 
   return 0;
 }

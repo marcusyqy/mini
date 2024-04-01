@@ -8,7 +8,7 @@
 
 namespace draw {
 
-using Vk_Stack_Allocator = Stack_Allocator<mega_bytes(1)>;
+using Vk_Arena = Linear_Allocator<mega_bytes(1)>;
 void setup_vulkan(const char** extensions, u32 count);
 void cleanup_vulkan();
 

@@ -111,7 +111,7 @@ static VkQueue queue                             = VK_NULL_HANDLE;
 static VkDebugReportCallbackEXT debug_report     = VK_NULL_HANDLE;
 static VkPipelineCache pipeline_cache            = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool          = VK_NULL_HANDLE;
-static Vk_Stack_Allocator arena                  = {};
+static Vk_Arena arena                            = {};
 
 static bool
     is_extensions_available(const VkExtensionProperties* properties, u32 properties_count, const char* extension) {
