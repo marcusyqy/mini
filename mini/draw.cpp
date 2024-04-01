@@ -10,7 +10,8 @@
 #include <vulkan/vulkan_win32.h>
 #endif
 
-// for imgui
+// for imgui 
+// @TODO: remove this. (just use this for now).
 #include "imgui_impl_vulkan.h"
 
 // std libs
@@ -384,11 +385,31 @@ void cleanup_vulkan() {
   vkDestroyInstance(instance, allocator_callback);
 }
 
+namespace to_remove {
+ImGui_ImplVulkanH_Window main_window_imgui_impl;
+}
+
+// I think you are only able to create one here because we need to manage people's expectations.
 Window create_surface(GLFWwindow* window) {
   // Create Window Surface
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   vk_check(glfwCreateWindowSurface(instance, window, allocator_callback, &surface));
-  return {};
+
+  // Create Framebuffers
+  int w, h;
+  glfwGetFramebufferSize(window, &w, &h);
+  ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
+  // SetupVulkanWindow(wd, surface, w, h);
+  wd->Surface = surface;
+
+  VkBool32 res = VK_FALSE;
+  // I think we have to call this or we get a validation error.
+  vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, queue_family, wd->Surface, &res);
+  assert(res == VK_TRUE);
+
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+
+  return { window, surface, swapchain };
 }
 
 } // namespace draw
