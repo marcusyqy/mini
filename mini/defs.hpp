@@ -44,16 +44,16 @@ private:
 #define ANONYMOUS_VARIABLE(str) CONCATENATE(str, __LINE__)
 #endif
 
-enum class DeferHelper {};
+enum class Defer_Helper {};
 
 template <typename Fn>
-Defer<Fn> operator+(DeferHelper, Fn&& fn) {
+Defer<Fn> operator+(Defer_Helper, Fn&& fn) {
   return Defer<Fn>{ std::forward<Fn&&>(fn) };
 }
 
 } // namespace detail
 
-#define defer auto ANONYMOUS_VARIABLE(DEFER_FUNCTION) = ::detail::DeferHelper() + [&]()
+#define defer auto ANONYMOUS_VARIABLE(DEFER_FUNCTION) = ::detail::Defer_Helper() + [&]()
 #define DEFER defer
 
 #define kilo_bytes(bytes) ((bytes) << 10)

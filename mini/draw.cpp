@@ -141,9 +141,9 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
   VkApplicationInfo app_info  = {};
   app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext              = nullptr;
-  app_info.pApplicationName   = "mini_app"; // ??
+  app_info.pApplicationName   = "mini application";
   app_info.applicationVersion = VK_MAKE_VERSION(0, 0, 0);
-  app_info.pEngineName        = "mini";
+  app_info.pEngineName        = "mini engine";
   app_info.engineVersion      = VK_MAKE_VERSION(0, 0, 0);
   app_info.apiVersion         = vk_constants::api_version;
 
