@@ -82,8 +82,10 @@ struct Destructor_Node {
 enum struct Allocation_Instruction { alloc, resize, free };
 
 struct Allocator_Proc {
-  void* (
-      *_alloc_proc)(Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment) =
+  using _Alloc_Proc =
+      void* (*)(Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment);
+
+  _Alloc_Proc _alloc_proc =
       +[](Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment) -> void* {
     switch (alloc_instruction) {
       case Allocation_Instruction::alloc: return ::malloc(size);
@@ -93,6 +95,7 @@ struct Allocator_Proc {
     assert(false);
     return nullptr;
   };
+
   void (*_free)(void* allocator, void* memory) = +[](void*, void* memory) { ::free(memory); };
   void* _allocator                             = nullptr;
 
@@ -142,6 +145,7 @@ struct Linear_Allocator {
 
     *node = (Node*)alloc_proc.allocate(sizeof(Node), alignof(Node));
     assert(*node);
+
     auto& n = *node;
     // should i consider memsetting?
     n->stack.current = 0; // need to reset in the event that allocate doesn't memset.
@@ -151,9 +155,8 @@ struct Linear_Allocator {
     auto p   = buf + (uintptr_t)n->stack.current;
     auto a   = (uintptr_t)alignment;
     auto mod = p & (a - 1);
-    if (mod != 0) {
-      p += a - mod;
-    }
+    if (mod != 0) p += a - mod;
+
     auto result = p + (uintptr_t)size - buf;
     assert(result < page_size);
     assert(result >= 0);
