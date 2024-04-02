@@ -2,6 +2,7 @@
 setlocal
 cd /D "%~dp0"
 
+:: @TODO add clang
 for %%a in (%*) do set "%%a=1"
 if not "%release%"=="1" set debug=1
 if "%debug%"=="1"   set release=0 && echo [debug mode]
@@ -72,11 +73,12 @@ set imgui_link= ..\extra\imgui\build\imgui.lib
 set adapters_link= ..\extra\adapter\build\adapter.lib
 
 set win32_link=gdi32.lib kernel32.lib user32.lib Shell32.lib legacy_stdio_definitions.lib
-set common_links= /link /LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% vulkan-1.lib 
+set common_links= /link /LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% vulkan-1.lib
 
 set links=
-if "%debug%"=="1" set links= %common_links% %debug_links% 
-if "%release%"=="1" set links= %common_links% %release_links% 
+if "%debug%"=="1" set links= %common_links% %debug_links%
+if "%release%"=="1" set links= %common_links% %release_links%
+
 
 if not exist build mkdir build
 pushd build

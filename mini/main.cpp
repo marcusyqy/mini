@@ -150,20 +150,19 @@ int main(int, char**) {
       ImGui::End();
     }
 
-    // Rendering
+    // Rendering UI
     ImGui::Render();
-    ImDrawData* main_draw_data      = ImGui::GetDrawData();
-    const bool main_is_minimized    = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
+    ImDrawData* main_draw_data   = ImGui::GetDrawData();
+    const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
     draw::set_clear_color(
-      vk_win,
-      clear_color.x * clear_color.w,
-      clear_color.y * clear_color.w,
-      clear_color.z * clear_color.w,
-      clear_color.w
-    );
+        vk_win,
+        clear_color.x * clear_color.w,
+        clear_color.y * clear_color.w,
+        clear_color.z * clear_color.w,
+        clear_color.w);
 
     if (!main_is_minimized) draw::render_frame(vk_win, main_draw_data);
-    
+
     // Update and Render additional Platform Windows
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
       ImGui::UpdatePlatformWindows();

@@ -1,20 +1,20 @@
 
 
 #if defined(_WIN32)
-#include "os_windows.hpp"
-#if 0 
+#include "os_win32.hpp"
+#if 0
 
 #define NO_ENTRY_POINT
 
-#include "windows.hpp"
 #include "core.hpp"
 #include "render.hpp"
+#include "windows.hpp"
 
 #include "basic.hpp"
 #include "logger.hpp"
 #include <algorithm>
 
-#define WIN32_LEAN_AND_MEAN      // Exclude rarely-used stuff from Windows headers
+#define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 
 #pragma comment(lib, "kernel32")

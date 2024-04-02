@@ -1,8 +1,8 @@
 #pragma once
-#include "defs.hpp"
 #include "core/memory.hpp"
-#include <vulkan/vulkan.h>
+#include "defs.hpp"
 #include "imgui.h"
+#include <vulkan/vulkan.h>
 
 struct GLFWwindow;
 
@@ -13,8 +13,8 @@ void setup_vulkan(const char** extensions, u32 count);
 void cleanup_vulkan();
 
 struct Window {
-  GLFWwindow* window       = nullptr;
-  VkSurfaceKHR surface     = VK_NULL_HANDLE;
+  GLFWwindow* window   = nullptr;
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
 };
 
 // this will be used as the main window.

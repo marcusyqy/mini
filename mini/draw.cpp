@@ -55,12 +55,12 @@ static void vk_check(VkResult err) {
 
 VkBool32 vk_get_physical_device_present_support(VkInstance instance, VkPhysicalDevice physical_device, u32 index) {
   return glfwGetPhysicalDevicePresentationSupport(instance, physical_device, index);
-// #if defined(_WIN32)
-//   (void)instance;
-//   return vkGetPhysicalDeviceWin32PresentationSupportKHR(physical_device, index);
-// #else
-//   static_assert(false, "Other platforms other than windows not supported currently.");
-// #endif
+  // #if defined(_WIN32)
+  //   (void)instance;
+  //   return vkGetPhysicalDeviceWin32PresentationSupportKHR(physical_device, index);
+  // #else
+  //   static_assert(false, "Other platforms other than windows not supported currently.");
+  // #endif
 }
 
 namespace vk_callbacks {
@@ -550,7 +550,7 @@ void present_frame(const Window& window) {
 
 void set_clear_color(const Window& window, float x, float y, float z, float w) {
   assert(to_remove::main_window_imgui_impl.Surface == window.surface);
-  ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
+  ImGui_ImplVulkanH_Window* wd    = &to_remove::main_window_imgui_impl;
   wd->ClearValue.color.float32[0] = x;
   wd->ClearValue.color.float32[1] = y;
   wd->ClearValue.color.float32[2] = z;

@@ -79,27 +79,19 @@ struct Destructor_Node {
 
 } // namespace detail
 
-enum struct Allocation_Instruction {
-  alloc, resize, free
-};
+enum struct Allocation_Instruction { alloc, resize, free };
 
 struct Allocator_Proc {
-  void* (*_alloc_proc)(
-    Allocation_Instruction alloc_instruction,
-    void* allocator, void* memory, u32 size, u32 alignment) = 
-    +[](Allocation_Instruction alloc_instruction,
-    void* allocator, void* memory, u32 size, u32 alignment) -> void* {
-      switch(alloc_instruction) {
-        case Allocation_Instruction::alloc:
-          return ::malloc(size);
-        case Allocation_Instruction::free:
-          ::free(memory);
-          return nullptr;
-        case Allocation_Instruction::resize:
-          return ::realloc(memory, size);
-      }
-      assert(false);
-      return nullptr;
+  void* (
+      *_alloc_proc)(Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment) =
+      +[](Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment) -> void* {
+    switch (alloc_instruction) {
+      case Allocation_Instruction::alloc: return ::malloc(size);
+      case Allocation_Instruction::free: ::free(memory); return nullptr;
+      case Allocation_Instruction::resize: return ::realloc(memory, size);
+    }
+    assert(false);
+    return nullptr;
   };
   void (*_free)(void* allocator, void* memory) = +[](void*, void* memory) { ::free(memory); };
   void* _allocator                             = nullptr;
@@ -241,7 +233,7 @@ struct Linear_Allocator {
     }
   }
 
-  Linear_Allocator()                                        = default;
+  Linear_Allocator()                                         = default;
   Linear_Allocator(const Linear_Allocator& o)                = delete;
   Linear_Allocator& operator=(const Linear_Allocator& o)     = delete;
   Linear_Allocator(Linear_Allocator&& o) noexcept            = delete;
@@ -263,7 +255,7 @@ private:
   };
 
 private:
-  Node* head                         = nullptr;
+  Node* head                               = nullptr;
   detail::Destructor_Node* destructor_list = nullptr;
   Allocator_Proc alloc_proc                = {};
 };
