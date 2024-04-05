@@ -86,7 +86,7 @@ int main(int, char**) {
   // load font
   ImFontConfig font_config{};
   font_config.FontDataOwnedByAtlas = false;
-  io.Fonts->AddFontFromMemoryTTF((void*)roboto_font_bytes, sizeof(roboto_font_bytes), 15.0f, &font_config);
+  io.Fonts->AddFontFromMemoryTTF((void*)roboto_font_bytes, sizeof(roboto_font_bytes), 14.0f, &font_config);
 
   /// at the end since i want to see the colors i am printing out.
   log_info("info");

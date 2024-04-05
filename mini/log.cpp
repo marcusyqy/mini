@@ -46,6 +46,7 @@ static const char* to_color(Log_Level level) {
 
 } // namespace helper
 
+// @TODO: something we can do to improve this is only log to a proper console similar to how spdlog does it.
 // temporary implementation until we can do a better job.
 void console_log_print_line(Log_Level level, const char* message, ...) {
   va_list list;
