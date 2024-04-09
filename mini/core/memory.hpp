@@ -115,6 +115,7 @@ struct Allocator_Proc {
   }
 };
 
+// @TODO add this to an alloc_proc as well.
 template <u32 page_size>
 struct Linear_Allocator {
   static_assert(is_power_of_two(page_size), "Stack pages must be in power of two.");
