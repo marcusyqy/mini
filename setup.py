@@ -22,9 +22,10 @@ def process_win32_env(str):
 
 def generate_compile_commands():
   print("Generating compile_flags.txt...")
+
   compile_flags=""
-  for i in range(0, len(includes)):
-    compile_flags += "-I" + includes[i] + "\n"
+  for include in includes:
+    compile_flags += "-I" + include + "\n"
 
   assert os.environ.__contains__("VULKAN_SDK"), "Vulkan SDK needs to be downloaded since this project relies on it."
   compile_flags += "-I" + process_win32_env(os.environ["VULKAN_SDK"]) + "/Include\n"
@@ -36,3 +37,4 @@ def generate_compile_commands():
 if __name__ == "__main__":
   download_vulkan_if_not_available()
   generate_compile_commands()
+
