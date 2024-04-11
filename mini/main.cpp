@@ -6,7 +6,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "constant/roboto.font"
+#include "embed/roboto.font"
 
 #include "draw.hpp"
 #include "log.hpp"
