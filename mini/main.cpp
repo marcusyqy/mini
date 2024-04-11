@@ -69,7 +69,7 @@ int main(int, char**) {
   font_config.FontDataOwnedByAtlas = false;
   io.Fonts->AddFontFromMemoryTTF((void*)roboto_font_bytes, sizeof(roboto_font_bytes), 14.0f, &font_config);
 
-  /// at the end since i want to see the colors i am printing out.
+  /// Just want to see the colors we are printing out
   log_info("info");
   log_error("error");
   log_debug("debug");
