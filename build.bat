@@ -61,7 +61,7 @@ set debug_links="shaderc_sharedd.lib"
 set release_links="shaderc_shared.lib"
 
 set compile_flags=
-set include_deps= /I..\extra\imgui\imgui /I..\extra\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include
+set include_deps= /I..\extra\imgui /I..\extra\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include
 set common_flags= %include_deps% /I..\mini\ /nologo /MP /FC /Zi /Zc:__cplusplus /std:c++17 /wd4530 /utf-8
 
 

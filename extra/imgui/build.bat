@@ -11,7 +11,7 @@ set debug_flags= /Od /D_DEBUG /MTd
 set release_flags= /O2 /DNDEBUG /MT
 
 set compile_flags=
-set common_flags= /I..\imgui\ /nologo /MP /FC /Zi
+set common_flags= /I..\ /nologo /MP /FC /Zi
 
 if "%debug%"=="1" set compile_flags= %debug_flags% %common_flags%
 if "%release%"=="1" set compile_flags= %release_flags% %common_flags%

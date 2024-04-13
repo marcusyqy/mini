@@ -2,7 +2,7 @@
 import os
 from extra import Vulkan_Installer
 
-includes = [ "mini", "extra/imgui/imgui", "extra/glfw/include", "extra/adapter", "extra/volk" ]
+includes = [ "mini", "extra/imgui", "extra/glfw/include", "extra/adapter", "extra/volk", "extra/glm" ]
 
 def download_vulkan_if_not_available():
   # TODO: Download vulkan.
