@@ -12,3 +12,5 @@
 - [ ] Change vulkan to volk? 
 - [ ] Decouple from GLFW
 - [ ] Win32 layer.
+- [ ] Work in C? 
+  - need to decouple with imgui and glm
