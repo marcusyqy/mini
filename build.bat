@@ -56,14 +56,14 @@ pushd mini
 popd
 )
 
-set debug_flags= /Od /D_DEBUG /MTd
-set release_flags= /O2 /DNDEBUG /MT
+set debug_flags= -Od -D_DEBUG -MTd
+set release_flags= -O2 -DNDEBUG -MT
 set debug_links="shaderc_sharedd.lib"
 set release_links="shaderc_shared.lib"
 
 set compile_flags=
-set include_deps= /I..\extra\imgui /I..\extra\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include /I..\extra\volk
-set common_flags= %include_deps% /I..\mini\ /nologo /MP /FC /Zi /Zc:__cplusplus /std:c++17 /wd4530 /utf-8
+set include_deps= -I..\extra\imgui -I..\extra\glfw\include -I..\extra\adapter -I%VULKAN_SDK%\Include -I..\extra\volk
+set common_flags= %include_deps% -I..\mini\ -nologo -MP -FC -Zi -Zc:__cplusplus -std:c++17 -wd4530 -utf-8
 
 
 if "%debug%"=="1" set compile_flags= %debug_flags% %common_flags%
@@ -74,7 +74,7 @@ set imgui_link= ..\extra\imgui\build\imgui.lib
 set adapters_link= ..\extra\adapter\build\adapter.lib
 
 set win32_link=gdi32.lib kernel32.lib user32.lib Shell32.lib legacy_stdio_definitions.lib
-set common_links= /link /LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% vulkan-1.lib
+set common_links= -link -LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% vulkan-1.lib
 
 set links=
 if "%debug%"=="1" set links= %common_links% %debug_links%
@@ -84,7 +84,7 @@ if "%release%"=="1" set links= %common_links% %release_links%
 if not exist build mkdir build
 pushd build
 set build_main=
-if "%main%"=="1" set build_main= call cl %compile_flags% ..\mini\single_include_compile.cpp /Fe:mini.exe %links% && echo [BUILDING MINI]
+if "%main%"=="1" set build_main= call cl %compile_flags% ..\mini\single_include_compile.cpp -Fe:mini.exe %links% && echo [BUILDING MINI]
 %build_main%
 set run_main=
 if "%run%" == "1" set run_main= call mini && echo [RUNNING MINI]
