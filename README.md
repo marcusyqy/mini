@@ -18,11 +18,6 @@ If we don't have more dependencies it should be trivial.
 ### Lols
 If you don't like either, the scripts should be simple enough to read and compile with your own flags.
 
-## TODO:
-- [ ] Make build delete file if failed.
-- [ ] Vulkan renderer.
-- [ ] Font renderer.
-- [ ] In-house ImGui.
-- [ ] Win32 layer.
-- [ ] Virtual Allocation.
-- [ ] Decouple from VulkanSDK.
+## TODOS:
+If you like to take a look at the TODOs for this project - [TODOs](./TODO.md). <br>
+We should start using issues when it gets bigger.

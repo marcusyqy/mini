@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+# possible TODO is to make this also run the bat file? 
 import os
 from extra import Vulkan_Installer
 
@@ -34,7 +36,15 @@ def generate_compile_commands():
   f = open("compile_flags.txt", "w")
   f.write(compile_flags)
 
+
+def need_setup():
+  setup_py = "setup.py"
+  compile_flags = "compile_flags.txt"
+  return not os.path.exists(compile_flags) or os.path.getmtime(setup_py) > os.path.getmtime(compile_flags) 
+
 if __name__ == "__main__":
-  download_vulkan_if_not_available()
-  generate_compile_commands()
+  if need_setup():
+    print("--[REGENERATING COMPILE_FLAGS]--")
+    download_vulkan_if_not_available()
+    generate_compile_commands()
 

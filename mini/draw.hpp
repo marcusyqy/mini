@@ -26,4 +26,7 @@ void set_clear_color(const Window& window, float x, float y, float z, float w);
 void render_frame(const Window& window, ImDrawData* draw_data);
 void present_frame(const Window& window);
 
+/// SCOPE OUT DRAW API HERE.
+
+
 } // namespace draw

@@ -90,8 +90,11 @@ int main(int, char**) {
     // them from your application based on those two flags.
     glfwPollEvents();
 
-    // Start the Dear ImGui frame
     draw::new_frame(vk_win);
+
+    // main program handled here(?)
+
+    // Start the Dear ImGui frame
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 

@@ -16,7 +16,8 @@ if "%all%" == "1" (
     set main=1
 )
 
-if "%setup%"=="1" echo [SETTING UP] && call python3 setup.py
+:: will always setup and let the script take note of when we need to rebuild instead.
+call python3 setup.py
 
 set forward_flags=
 if "%debug%"=="1"   set forward_flags=debug
@@ -61,7 +62,7 @@ set debug_links="shaderc_sharedd.lib"
 set release_links="shaderc_shared.lib"
 
 set compile_flags=
-set include_deps= /I..\extra\imgui /I..\extra\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include
+set include_deps= /I..\extra\imgui /I..\extra\glfw\include /I..\extra\adapter /I%VULKAN_SDK%\Include /I..\extra\volk
 set common_flags= %include_deps% /I..\mini\ /nologo /MP /FC /Zi /Zc:__cplusplus /std:c++17 /wd4530 /utf-8
 
 

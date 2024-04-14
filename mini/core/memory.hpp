@@ -99,6 +99,7 @@ struct Allocator_Proc {
   void (*_free)(void* allocator, void* memory) = +[](void*, void* memory) { ::free(memory); };
   void* _allocator                             = nullptr;
 
+  // TODO: change this to allocator instead of allocator proc
   void* allocate(u32 size, u32 alignment) {
     assert(_alloc_proc);
     return _alloc_proc(Allocation_Instruction::alloc, _allocator, nullptr, size, alignment);
@@ -115,7 +116,8 @@ struct Allocator_Proc {
   }
 };
 
-// @TODO add this to an alloc_proc as well.
+
+
 template <u32 page_size>
 struct Linear_Allocator {
   static_assert(is_power_of_two(page_size), "Stack pages must be in power of two.");
