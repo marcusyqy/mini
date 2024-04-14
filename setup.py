@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # possible TODO is to make this also run the bat file? 
-import os
+import os, sys
 from extra import Vulkan_Installer
 
 includes = [ "mini", "extra/imgui", "extra/glfw/include", "extra/adapter", "extra/volk", "extra/glm" ]
@@ -43,6 +43,7 @@ def need_setup():
   return not os.path.exists(compile_flags) or os.path.getmtime(setup_py) > os.path.getmtime(compile_flags) 
 
 if __name__ == "__main__":
+  assert sys.platform == 'win32', "CURRENTLY MINI DOESN'T SUPPORT NON WINDOWS BUILD."
   if need_setup():
     print("--[REGENERATING COMPILE_FLAGS]--")
     download_vulkan_if_not_available()
