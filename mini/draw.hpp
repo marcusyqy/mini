@@ -8,7 +8,6 @@ struct GLFWwindow;
 
 namespace draw {
 
-using Vk_Arena = Linear_Allocator<mega_bytes(1)>;
 // @TODO we can remove extensions and count when we totally bake the extensions inside
 void setup_vulkan(const char** extensions, u32 count);
 void cleanup_vulkan();

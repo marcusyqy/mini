@@ -95,9 +95,7 @@ struct Allocator_Proc {
     assert(false);
     return nullptr;
   };
-
-  void (*_free)(void* allocator, void* memory) = +[](void*, void* memory) { ::free(memory); };
-  void* _allocator                             = nullptr;
+  void* _allocator = nullptr;
 
   // TODO: change this to allocator instead of allocator proc
   void* allocate(u32 size, u32 alignment) {
@@ -116,12 +114,7 @@ struct Allocator_Proc {
   }
 };
 
-
-
-template <u32 page_size>
 struct Linear_Allocator {
-  static_assert(is_power_of_two(page_size), "Stack pages must be in power of two.");
-
   // this needs to be specific for T
   u8* push(u32 size, u32 alignment) {
     assert(is_power_of_two(alignment));
@@ -130,8 +123,8 @@ struct Linear_Allocator {
     // go through all the pages.
     while (*node) {
       auto& n  = *node;
-      auto buf = (uintptr_t)n->stack.buffer;
-      auto p   = buf + (uintptr_t)n->stack.current;
+      auto buf = (uintptr_t)get_stack_ptr(n);
+      auto p   = buf + (uintptr_t)n->current;
       auto a   = (uintptr_t)alignment;
       auto mod = p & (a - 1);
       if (mod != 0) {
@@ -140,22 +133,22 @@ struct Linear_Allocator {
       auto result = p + (uintptr_t)size - buf;
       if (result < page_size) {
         assert(result >= 0);
-        n->stack.current = (u32)result;
+        n->current = (u32)result;
         return (u8*)p;
       }
       node = &n->next;
     }
 
-    *node = (Node*)alloc_proc.allocate(sizeof(Node), alignof(Node));
+    *node = (Node*)alloc_proc.allocate(sizeof(Node) + page_size, alignof(Node));
     assert(*node);
 
     auto& n = *node;
     // should i consider memsetting?
-    n->stack.current = 0; // need to reset in the event that allocate doesn't memset.
-    n->next          = nullptr;
+    n->current = 0; // need to reset in the event that allocate doesn't memset.
+    n->next    = nullptr;
 
-    auto buf = (uintptr_t)n->stack.buffer;
-    auto p   = buf + (uintptr_t)n->stack.current;
+    auto buf = (uintptr_t)get_stack_ptr(n);
+    auto p   = buf + (uintptr_t)n->current;
     auto a   = (uintptr_t)alignment;
     auto mod = p & (a - 1);
     if (mod != 0) p += a - mod;
@@ -163,7 +156,7 @@ struct Linear_Allocator {
     auto result = p + (uintptr_t)size - buf;
     assert(result < page_size);
     assert(result >= 0);
-    n->stack.current = (u32)result;
+    n->current = (u32)result;
     return (u8*)p;
   }
 
@@ -216,8 +209,8 @@ struct Linear_Allocator {
     auto tmp = head;
 
     while (tmp) {
-      tmp->stack.current = 0;
-      tmp                = tmp->next;
+      tmp->current = 0;
+      tmp          = tmp->next;
     }
 
     while (destructor_list) {
@@ -239,7 +232,6 @@ struct Linear_Allocator {
     }
   }
 
-  Linear_Allocator()                                         = default;
   Linear_Allocator(const Linear_Allocator& o)                = delete;
   Linear_Allocator& operator=(const Linear_Allocator& o)     = delete;
   Linear_Allocator(Linear_Allocator&& o) noexcept            = delete;
@@ -247,23 +239,24 @@ struct Linear_Allocator {
 
   ~Linear_Allocator() { free(); }
 
-  Linear_Allocator(Allocator_Proc _alloc_proc) : alloc_proc(_alloc_proc) {}
+  Linear_Allocator() = default;
+  Linear_Allocator(u32 _page_size, Allocator_Proc _alloc_proc = {}) :
+      page_size{ _page_size }, alloc_proc{ _alloc_proc } {
+    assert(is_power_of_two(page_size));
+  }
 
 private:
-  struct Page {
-    u8 buffer[page_size];
+  struct Node {
+    Node* next  = nullptr;
     u32 current = {};
+    // wasting 4 bytes of stuff here.
   };
 
-  struct Node {
-    Page stack;
-    Node* next = nullptr;
-  };
+  Node* get_stack_ptr(Node* n) { return n + 1; }
 
 private:
   Node* head                               = nullptr;
   detail::Destructor_Node* destructor_list = nullptr;
   Allocator_Proc alloc_proc                = {};
+  u32 page_size                            = mega_bytes(1); // default
 };
-
-using Default_Linear_Allocator = Linear_Allocator<1u << 16>;
