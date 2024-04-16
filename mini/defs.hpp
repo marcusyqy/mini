@@ -61,4 +61,4 @@ Defer<Fn> operator+(Defer_Helper, Fn&& fn) {
 #define giga_bytes(bytes) ((bytes) << 30)
 
 #define is_power_of_two(X) (((X) & ((X)-1)) == 0)
-#define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
+#define ARRAY_SIZE(X)      (sizeof(X) / sizeof(X[0]))

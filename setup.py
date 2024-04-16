@@ -4,7 +4,15 @@
 import os, sys
 from extra import Vulkan_Installer
 
-includes = [ "mini", "extra/imgui", "extra/glfw/include", "extra/adapter", "extra/volk", "extra/glm" ]
+includes = [ 
+  "mini", 
+  "extra/imgui", 
+  "extra/glfw/include", 
+  "extra/adapter", 
+  "extra/volk", 
+  "extra/glm", 
+  "extra/vma", 
+]
 
 def download_vulkan_if_not_available():
   # TODO: Download vulkan.

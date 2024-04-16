@@ -33,10 +33,7 @@ int main(int, char**) {
     return 1;
   }
 
-  u32 extension_count     = {};
-  const char** extensions = glfwGetRequiredInstanceExtensions(&extension_count);
-
-  draw::setup_vulkan(extensions, extension_count);
+  draw::setup_vulkan();
   defer { draw::cleanup_vulkan(); };
 
   IMGUI_CHECKVERSION();

@@ -11,5 +11,3 @@ struct String {
   char* data;
   s32 size;
 };
-
-

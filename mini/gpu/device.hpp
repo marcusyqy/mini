@@ -10,10 +10,10 @@
 struct GLFWwindow;
 
 struct Device {
-  VkDevice logical = VK_NULL_HANDLE;
+  VkDevice logical          = VK_NULL_HANDLE;
   VkPhysicalDevice physical = VK_NULL_HANDLE;
-  VkQueue queue = VK_NULL_HANDLE;
-  u32 queue_family = (u32)-1;
+  VkQueue queue             = VK_NULL_HANDLE;
+  u32 queue_family          = (u32)-1;
 };
 
 VkInstance init_gpu(Linear_Allocator& arena);

@@ -1,6 +1,11 @@
 #pragma once
 #include <vulkan/vulkan.h>
 
-void vk_check_impl(VkResult err); 
+void VK_CHECK(VkResult err);
+struct Buffer {
+  VkBuffer buffer;
+};
 
-#define VK_CHECK(err) vk_check_impl(err)
+struct Image {
+  VkImage buffer;
+};

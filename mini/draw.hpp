@@ -9,7 +9,7 @@ struct GLFWwindow;
 namespace draw {
 
 // @TODO we can remove extensions and count when we totally bake the extensions inside
-void setup_vulkan(const char** extensions, u32 count);
+void setup_vulkan();
 void cleanup_vulkan();
 
 struct Window {
@@ -27,6 +27,5 @@ void render_frame(const Window& window, ImDrawData* draw_data);
 void present_frame(const Window& window);
 
 /// SCOPE OUT DRAW API HERE.
-
 
 } // namespace draw

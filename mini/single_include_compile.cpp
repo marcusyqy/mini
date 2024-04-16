@@ -1,5 +1,6 @@
 // embeded links (we need to move to volk to properly use this.)
 // #include "embed/volk.mini"
+#include "embed/vma.mini"
 
 // gpu files
 #include "gpu/common.cpp"

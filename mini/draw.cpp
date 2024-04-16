@@ -5,7 +5,6 @@
 #include "gpu/surface.hpp"
 #include "imgui_impl_vulkan.h"
 
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -42,19 +41,19 @@ static void vk_check(VkResult err) {
 // globals
 static VkAllocationCallbacks* allocator_callback = nullptr;
 static VkInstance instance                       = VK_NULL_HANDLE;
-static Device device = {};
+static Device device                             = {};
 static VkPipelineCache pipeline_cache            = VK_NULL_HANDLE;
 static VkDescriptorPool descriptor_pool          = VK_NULL_HANDLE;
 static Linear_Allocator arena                    = { mega_bytes(1) };
-constexpr static int swapchain_min_image_count = 2;
+constexpr static int swapchain_min_image_count   = 2;
 
 namespace vk_state {
 static bool swapchain_rebuild = false;
 }
 
-void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions_count) {
+void setup_vulkan() {
   instance = init_gpu(arena);
-  device = create_device(arena);
+  device   = create_device(arena);
 
   // Create Descriptor Pool
   // The example only requires a single combined image sampler descriptor for the font image and only uses one
@@ -86,12 +85,12 @@ ImGui_ImplVulkanH_Window main_window_imgui_impl = {};
 // I think you are only able to create one here because we need to manage people's expectations.
 Window create_surface(GLFWwindow* window) {
   // Create Window Surface
-  Surface s = ::create_surface(device, window);
+  Surface s            = ::create_surface(arena, device, window);
   VkSurfaceKHR surface = s.surface;
 
   // Create Framebuffers
   ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
-  wd->Surface = surface;
+  wd->Surface                  = surface;
 
   // Select Surface Format
   const VkFormat requestSurfaceImageFormat[]     = { VK_FORMAT_B8G8R8A8_UNORM,
