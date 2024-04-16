@@ -4,6 +4,7 @@
 // gpu files
 #include "gpu/common.cpp"
 #include "gpu/device.cpp"
+#include "gpu/surface.cpp"
 
 // other files
 #include "draw.cpp"

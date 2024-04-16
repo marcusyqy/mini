@@ -144,9 +144,6 @@ struct Linear_Allocator {
 
     auto& n = *node;
     memset(n, 0, sizeof(Node)); // doesn't memset the bytes.
-    // should i consider memsetting?
-    // n->current = 0; // need to reset in the event that allocate doesn't memset.
-    // n->next    = nullptr;
 
     auto buf = (uintptr_t)get_stack_ptr(n);
     auto p   = buf + (uintptr_t)n->current;

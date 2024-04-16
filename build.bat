@@ -7,7 +7,7 @@ for %%a in (%*) do set "%%a=1"
 if not "%release%"=="1" set debug=1
 if "%debug%"=="1"   set release=0 && echo [debug mode]
 if "%release%"=="1" set debug=0 && echo [release mode]
-if "%~1"==""        echo [default mode] && set all=1
+if "%~1"==""        echo [default mode] && set main=1
 
 if "%all%" == "1" (
     set glfw=1

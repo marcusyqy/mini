@@ -3,9 +3,11 @@
 
 /// @TODO: remove dependency on glfw.
 
-#include <GLFW/glfw3.h>
 #include "core/memory.hpp"
 #include "defs.hpp"
+
+// forward declare
+struct GLFWwindow;
 
 struct Device {
   VkDevice logical = VK_NULL_HANDLE;
@@ -14,16 +16,11 @@ struct Device {
   u32 queue_family = (u32)-1;
 };
 
-
-struct Device_Properties {
-
-};
-
 VkInstance init_gpu(Linear_Allocator& arena);
 void cleanup_gpu();
 
-Device create_device(Linear_Allocator& arena, Device_Properties properties = {});
-void free_device(Device device);
+Device create_device(Linear_Allocator& arena);
+void destroy_device(Device device);
 
 /// create surface for now.
-VkSurfaceKHR platform_create_surface(GLFWwindow* window);
+VkSurfaceKHR platform_create_vk_surface(GLFWwindow* window);

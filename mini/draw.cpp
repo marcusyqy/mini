@@ -2,6 +2,7 @@
 // for imgui
 // @TODO: remove this. (just use this for now).
 #include "gpu/device.hpp"
+#include "gpu/surface.hpp"
 #include "imgui_impl_vulkan.h"
 
 
@@ -74,7 +75,7 @@ void setup_vulkan(const char** instance_extensions_glfw, u32 instance_extensions
 
 void cleanup_vulkan() {
   vkDestroyDescriptorPool(device.logical, descriptor_pool, allocator_callback);
-  free_device(device);
+  destroy_device(device);
   cleanup_gpu();
 }
 
@@ -85,22 +86,13 @@ ImGui_ImplVulkanH_Window main_window_imgui_impl = {};
 // I think you are only able to create one here because we need to manage people's expectations.
 Window create_surface(GLFWwindow* window) {
   // Create Window Surface
-  VkSurfaceKHR surface = platform_create_surface(window);
+  Surface s = ::create_surface(device, window);
+  VkSurfaceKHR surface = s.surface;
 
   // Create Framebuffers
-  int width, height;
-  glfwGetFramebufferSize(window, &width, &height);
   ImGui_ImplVulkanH_Window* wd = &to_remove::main_window_imgui_impl;
-  log_debug("made it here maybe");
-  // SetupVulkanWindow(wd, surface, w, h);
   wd->Surface = surface;
 
-  VkBool32 res = VK_FALSE;
-  // I think we have to call this or we get a validation error.
-  vkGetPhysicalDeviceSurfaceSupportKHR(device.physical, device.queue_family, wd->Surface, &res);
-  assert(res == VK_TRUE);
-
-  log_debug("made it here maybe");
   // Select Surface Format
   const VkFormat requestSurfaceImageFormat[]     = { VK_FORMAT_B8G8R8A8_UNORM,
                                                      VK_FORMAT_R8G8B8A8_UNORM,
@@ -136,8 +128,8 @@ Window create_surface(GLFWwindow* window) {
       wd,
       device.queue_family,
       allocator_callback,
-      width,
-      height,
+      s.width,
+      s.height,
       swapchain_min_image_count);
 
   // Setup Platform/Renderer backends
@@ -165,6 +157,12 @@ void destroy_surface(Window& window) {
   assert(to_remove::main_window_imgui_impl.Surface == window.surface);
 
   vk_check(vkDeviceWaitIdle(device.logical));
+
+  // just to do it correctly.
+  Surface s;
+  s.surface = window.surface;
+  ::destroy_surface(device, s);
+
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplVulkanH_DestroyWindow(instance, device.logical, &to_remove::main_window_imgui_impl, allocator_callback);
 }
