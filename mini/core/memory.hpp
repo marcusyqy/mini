@@ -143,9 +143,10 @@ struct Linear_Allocator {
     assert(*node);
 
     auto& n = *node;
+    memset(n, 0, sizeof(Node)); // doesn't memset the bytes.
     // should i consider memsetting?
-    n->current = 0; // need to reset in the event that allocate doesn't memset.
-    n->next    = nullptr;
+    // n->current = 0; // need to reset in the event that allocate doesn't memset.
+    // n->next    = nullptr;
 
     auto buf = (uintptr_t)get_stack_ptr(n);
     auto p   = buf + (uintptr_t)n->current;
@@ -248,7 +249,7 @@ struct Linear_Allocator {
 private:
   struct Node {
     Node* next  = nullptr;
-    u32 current = {};
+    u32 current = {}; // one way we can do it here is to make current be shared across
     // wasting 4 bytes of stuff here.
   };
 
