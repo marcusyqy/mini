@@ -110,7 +110,7 @@ struct Allocator_Proc {
 
   void* realloc(void* memory, u32 size, u32 alignment) {
     assert(_alloc_proc);
-    _alloc_proc(Allocation_Instruction::free, _allocator, memory, size, alignment);
+    _alloc_proc(Allocation_Instruction::resize, _allocator, memory, size, alignment);
   }
 };
 
