@@ -6,6 +6,7 @@ for %%a in (%*) do set "%%a=1"
 if not "%release%"=="1" set debug=1
 if "%debug%"=="1"   set release=0 && echo [debug mode]
 if "%release%"=="1" set debug=0 && echo [release mode]
+if "%clean%" == "1" rd /s /q build && echo [CLEANING ADAPTER] 
 
 set debug_flags= /Od /D_DEBUG /MTd
 set release_flags= /O2 /DNDEBUG /MT

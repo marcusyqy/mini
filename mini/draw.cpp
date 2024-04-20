@@ -52,7 +52,7 @@ static bool swapchain_rebuild = false;
 }
 
 void setup_vulkan() {
-  instance = init_gpu(arena);
+  instance = init_gpu_instance(arena);
   device   = create_device(arena);
 
   // Create Descriptor Pool
@@ -75,7 +75,7 @@ void setup_vulkan() {
 void cleanup_vulkan() {
   vkDestroyDescriptorPool(device.logical, descriptor_pool, allocator_callback);
   destroy_device(device);
-  cleanup_gpu();
+  cleanup_gpu_instance();
 }
 
 namespace to_remove {

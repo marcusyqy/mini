@@ -16,30 +16,30 @@ if "%all%" == "1" (
     set main=1
 )
 
+if "%clean%" == "1" (
+    rd /s /q build && echo [CLEANING MINI]
+) 
+
 :: will always setup and let the script take note of when we need to rebuild instead.
 call python3 setup.py
 
-set forward_flags=
-if "%debug%"=="1"   set forward_flags=debug
-if "%release%"=="1"   set forward_flags=release
-
 :: build glfw
 set build_glfw=
-if "%glfw%"=="1" set build_glfw= call build %forward_flags% && echo [BUILDING GLFW]
+if "%glfw%"=="1" set build_glfw= call build && echo [BUILDING GLFW]
 pushd extra\glfw
 call %build_glfw%
 popd
 
 :: build imgui
 set build_imgui=
-if "%imgui%"=="1" set build_imgui= call build %forward_flags% && echo [BUILDING IMGUI]
+if "%imgui%"=="1" set build_imgui= call build && echo [BUILDING IMGUI]
 pushd extra\imgui
 %build_imgui%
 popd
 
 :: build adapter
 set build_adapter=
-if "%adapter%"=="1" set build_adapter= call build %forward_flags% && echo [BUILDING ADAPTER]
+if "%adapter%"=="1" set build_adapter= call build && echo [BUILDING ADAPTER]
 pushd extra\adapter
 %build_adapter%
 popd
@@ -62,9 +62,9 @@ set debug_links="shaderc_sharedd.lib"
 set release_links="shaderc_shared.lib"
 
 set compile_flags=
-set include_deps= -I..\extra\imgui -I..\extra\glfw\include -I..\extra\adapter -I%VULKAN_SDK%\Include -I..\extra\volk -I..\extra\glm -I..\extra\vma
-set common_flags= %include_deps% -I..\mini\ -nologo -MP -FC -Zi -Zc:__cplusplus -std:c++17 -wd4530 -utf-8
-
+set external_includes_dep= -external:I..\extra\imgui -external:I..\extra\glfw\include -external:I..\extra\adapter -external:I%VULKAN_SDK%\Include -external:I..\extra\volk -external:I..\extra\glm -external:I..\extra\vma 
+set include_deps= %external_includes_dep% -I..\mini\ 
+set common_flags= %include_deps% -nologo -MP -FC -Zi -Zc:__cplusplus -std:c++17 -wd4530 -utf-8 -WX -W3 -external:W0 -EHsc
 
 if "%debug%"=="1" set compile_flags= %debug_flags% %common_flags%
 if "%release%"=="1" set compile_flags= %release_flags% %common_flags%
@@ -80,12 +80,11 @@ set links=
 if "%debug%"=="1" set links= %common_links% %debug_links%
 if "%release%"=="1" set links= %common_links% %release_links%
 
-
 if not exist build mkdir build
 pushd build
 set build_main=
 if "%main%"=="1" set build_main= call cl %compile_flags% ..\mini\single_include_compile.cpp -Fe:mini.exe %links% && echo [BUILDING MINI]
-%build_main%
+%build_main% 
 set run_main=
 if "%run%" == "1" set run_main= call mini && echo [RUNNING MINI]
 %run_main%

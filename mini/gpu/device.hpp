@@ -16,8 +16,8 @@ struct Device {
   u32 queue_family          = (u32)-1;
 };
 
-VkInstance init_gpu(Linear_Allocator& arena);
-void cleanup_gpu();
+VkInstance init_gpu_instance(Linear_Allocator& arena);
+void cleanup_gpu_instance();
 
 Device create_device(Linear_Allocator& arena);
 void destroy_device(Device device);

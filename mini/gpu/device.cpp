@@ -103,7 +103,7 @@ static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
 static VkDebugReportCallbackEXT debug_report    = VK_NULL_HANDLE;
 static bool vk_debug_layers_present             = false;
 
-VkInstance init_gpu(Linear_Allocator& arena) {
+VkInstance init_gpu_instance(Linear_Allocator& arena) {
   VkApplicationInfo app_info  = {};
   app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext              = nullptr;
@@ -169,7 +169,7 @@ VkInstance init_gpu(Linear_Allocator& arena) {
   create_info.enabledLayerCount   = 1;
   create_info.ppEnabledLayerNames = validation_layers;
 
-#if VK_ENABLE_VALIDATION
+#if VK_DEBUG
   instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
   instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 #endif
@@ -219,7 +219,7 @@ VkInstance init_gpu(Linear_Allocator& arena) {
   return instance;
 }
 
-void cleanup_gpu() {
+void cleanup_gpu_instance() {
 #if VK_DEBUG
   auto vkDestroyDebugUtilsMessengerEXT =
       (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -249,22 +249,59 @@ Device create_device(Linear_Allocator& arena) {
   auto gpus = arena.push_array_no_init<VkPhysicalDevice>(gpu_count);
   VK_CHECK(vkEnumeratePhysicalDevices(instance, &gpu_count, gpus));
 
+  constexpr auto required_version = VK_API_VERSION_1_3; 
+
+  //vulkan 1.3 features
+  VkPhysicalDeviceVulkan13Features features13{};
+  features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  features13.dynamicRendering = true;
+  features13.synchronization2 = true;
+
+  //vulkan 1.2 features
+  VkPhysicalDeviceVulkan12Features features12{};
+  features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  features12.bufferDeviceAddress = true;
+  features12.descriptorIndexing = true;
+
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
     /// @TODO: revisit this.
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(gpus[i], &properties);
+    if(properties.apiVersion < required_version) continue;
+
+    // Rendering features here.
     VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_parameters_feature = {};
     shader_draw_parameters_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
     shader_draw_parameters_feature.pNext = nullptr;
     shader_draw_parameters_feature.shaderDrawParameters = VK_TRUE;
 
+    //vulkan 1.2 feature
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.bufferDeviceAddress = VK_TRUE;
+    features12.descriptorIndexing = VK_TRUE;
+    features12.pNext = &shader_draw_parameters_feature;
+
+    //vulkan 1.3 features
+    VkPhysicalDeviceVulkan13Features features13{};
+    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.dynamicRendering = true;
+    features13.synchronization2 = VK_TRUE;
+    features13.pNext = &features12;
+
     VkPhysicalDeviceFeatures2 features = {};
     features.sType                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    features.pNext                     = &shader_draw_parameters_feature;
+    features.pNext                     = &features13;
+
     vkGetPhysicalDeviceFeatures2(gpus[i], &features);
 
+    // check for necessary features here.
     if (shader_draw_parameters_feature.shaderDrawParameters != VK_TRUE) continue;
+    if (features13.dynamicRendering != VK_TRUE) continue;
+    if (features13.synchronization2 != VK_TRUE) continue;
+    if (features12.descriptorIndexing != VK_TRUE) continue;
+    if (features12.bufferDeviceAddress != VK_TRUE) continue;
     if (features.features.geometryShader != VK_TRUE) continue;
 
     u32 extension_count = 0;

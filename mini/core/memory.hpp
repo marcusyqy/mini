@@ -73,8 +73,9 @@ namespace detail {
 struct Destructor_Node {
   void* ptr;
   void (*destruct)(void*, u32 size);
-  u32 size;
+
   Destructor_Node* next;
+  u32 size;
 };
 
 } // namespace detail
@@ -87,6 +88,8 @@ struct Allocator_Proc {
 
   _Alloc_Proc _alloc_proc =
       +[](Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment) -> void* {
+    static_cast<void>(alignment);
+    static_cast<void>(allocator);
     switch (alloc_instruction) {
       case Allocation_Instruction::alloc: return ::malloc(size);
       case Allocation_Instruction::free: ::free(memory); return nullptr;
