@@ -265,6 +265,7 @@ Device create_device(Linear_Allocator& arena) {
 
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
+    auto save_point = arena.save_current();
     /// @TODO: revisit this.
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(gpus[i], &properties);
@@ -346,6 +347,8 @@ Device create_device(Linear_Allocator& arena) {
       queue_family    = probable_queue_fam;
       break;
     }
+
+    arena.load(save_point);
   }
 
   // nothing was selected

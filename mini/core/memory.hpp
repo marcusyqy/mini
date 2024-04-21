@@ -199,11 +199,30 @@ struct Linear_Allocator {
     assert(is_power_of_two(page_size));
   }
 
+
 private:
   struct Node {
     Node* next = nullptr;
   };
   Node* get_stack_ptr(Node* n) { return n + 1; }
+
+  struct Save_Point {
+    Node* current;
+    const Linear_Allocator* whoami; 
+    Linear_Allocator_Strategy strategy;
+  };
+
+public:
+  Save_Point save_current() const {
+    return { current, this, strategy };
+  }
+
+  void load(Save_Point save_point) {
+    // maybe we need to check debug or something
+    assert(save_point.whoami == this);
+    current = save_point.current;
+    strategy = save_point.strategy;
+  }
 
 private:
   Node* head                         = nullptr;
