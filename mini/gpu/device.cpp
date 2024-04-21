@@ -239,8 +239,8 @@ void cleanup_gpu_instance() {
 
 Device create_device(Temp_Linear_Allocator arena) {
   /// TODO: add maybe properties to check? For rendering, for compute...
-  Device device   = {};
-  device.instance = instance;
+  Device device    = {};
+  device.instance  = instance;
   device.allocator = allocator;
 
   VkDevice& logical_device          = device.logical;

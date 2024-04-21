@@ -25,4 +25,4 @@ T clamp(T val, Disregard_Type<T> min, Disregard_Type<T> max) {
   return val < min ? min : (val > max ? max : val);
 }
 
-uintptr_t align_forward(uintptr_t ptr, u64 align); 
+uintptr_t align_forward(uintptr_t ptr, u64 align);

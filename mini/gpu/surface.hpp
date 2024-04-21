@@ -1,7 +1,7 @@
 #pragma once
+#include "core/memory.hpp"
 #include "defs.hpp"
 #include <vulkan/vulkan.h>
-#include "core/memory.hpp"
 
 struct GLFWwindow;
 struct Device;

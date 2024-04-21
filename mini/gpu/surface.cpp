@@ -39,7 +39,8 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
   VkSurfaceCapabilitiesKHR capabilities = {};
   VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical, surface->surface, &capabilities));
 
-  if (surface->swapchain != VK_NULL_HANDLE && capabilities.currentExtent.width == surface->width && capabilities.currentExtent.height == surface->height)
+  if (surface->swapchain != VK_NULL_HANDLE && capabilities.currentExtent.width == surface->width &&
+      capabilities.currentExtent.height == surface->height)
     return;
 
   s16 width  = surface->width;

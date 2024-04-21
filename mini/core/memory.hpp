@@ -104,7 +104,6 @@ struct Linear_Allocator_Strategy {
   void clear();
 };
 
-
 struct Temp_Linear_Allocator;
 
 struct Linear_Allocator {
@@ -138,7 +137,7 @@ struct Linear_Allocator {
     return (T*)p;
   }
 
-  void* push(u64 size, u64 alignment); 
+  void* push(u64 size, u64 alignment);
   void clear();
   void free();
 
@@ -167,14 +166,13 @@ public:
   Temp_Linear_Allocator save();
   void load(Temp_Linear_Allocator save_point);
 
- private:
+private:
   Node* head                         = nullptr;
   Node* current                      = nullptr;
   Linear_Allocator_Strategy strategy = {};
   Allocator allocator                = {};
   u64 page_size                      = mega_bytes(1); // default
 };
-
 
 struct Temp_Linear_Allocator {
   template <typename T>
@@ -197,17 +195,11 @@ struct Temp_Linear_Allocator {
     return save_point.allocator->push_zero<T>();
   }
 
-  void* push(u64 size, u64 alignment) {
-    return save_point.allocator->push(size, alignment);
-  }
+  void* push(u64 size, u64 alignment) { return save_point.allocator->push(size, alignment); }
 
-  void clear() {
-    save_point.allocator->load(save_point);
-  }
+  void clear() { save_point.allocator->load(save_point); }
 
-  Temp_Linear_Allocator save() {
-    return save_point.allocator->save();
-  }
+  Temp_Linear_Allocator save() { return save_point.allocator->save(); }
 
   Temp_Linear_Allocator(Linear_Allocator& allocator) : Temp_Linear_Allocator(allocator.save()) {}
   Temp_Linear_Allocator(Linear_Allocator::Save_Point _save_point) : save_point(_save_point) {}
