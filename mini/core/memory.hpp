@@ -105,33 +105,6 @@ struct Linear_Allocator_Strategy {
 };
 
 struct Linear_Allocator {
-  // this needs to be specific for T
-  void* push(u64 size, u64 alignment) {
-    if (current == nullptr) {
-      auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
-      assert(allocation.result != Allocation_Info::out_of_memory);
-      head    = (Node*)allocation.memory;
-      current = head;
-      strategy.init(get_stack_ptr(current), page_size);
-    }
-
-    auto allocation = strategy.alloc(size, alignment);
-    // current page no memory.
-    if (allocation.memory == nullptr && allocation.result == Allocation_Info::out_of_memory) {
-      auto new_allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
-      assert(new_allocation.result != Allocation_Info::out_of_memory);
-      current->next = (Node*)new_allocation.memory;
-      current       = current->next;
-      strategy.init(get_stack_ptr(current), page_size);
-    } else {
-      return allocation.memory;
-    }
-
-    // do it again
-    allocation = strategy.alloc(size, alignment);
-    assert(allocation.result != Allocation_Info::out_of_memory); // may need to grow page here?
-    return allocation.memory;
-  }
 
   template <typename T>
   T* push_no_init() {
@@ -158,35 +131,23 @@ struct Linear_Allocator {
   template <typename T>
   T* push_zero() {
     auto p = push(sizeof(T), alignof(T));
-    ::memset(p, 0, sizeof(T));
+    memset(p, 0, sizeof(T));
     return (T*)p;
   }
 
-  // need to call destructor for some T
-  void clear() {
-    current = head;
-    strategy.init(get_stack_ptr(current), page_size);
-  }
-
-  void free() {
-    while (head) {
-      auto tmp = head->next;
-      allocator.free((void*)tmp);
-      head = tmp;
-    }
-  }
+  void* push(u64 size, u64 alignment); 
+  void clear();
+  void free();
 
   Linear_Allocator(const Linear_Allocator& o)                = delete;
   Linear_Allocator& operator=(const Linear_Allocator& o)     = delete;
   Linear_Allocator(Linear_Allocator&& o) noexcept            = delete;
   Linear_Allocator& operator=(Linear_Allocator&& o) noexcept = delete;
 
-  ~Linear_Allocator() { free(); }
+  ~Linear_Allocator();
 
   Linear_Allocator() = default;
-  Linear_Allocator(u32 _page_size, Allocator _allocator = {}) : page_size{ _page_size }, allocator{ _allocator } {
-    // assert(is_power_of_two(page_size));
-  }
+  Linear_Allocator(u64 _page_size, Allocator _allocator = {});
 
 private:
   struct Node {
@@ -202,18 +163,13 @@ private:
   };
 
 public:
-  Save_Point save_current() const { return { current, this, strategy }; }
+  Save_Point save_current() const;
+  void load(Save_Point save_point);
 
-  void load(Save_Point save_point) {
-    assert(save_point.whoami == this);
-    current  = save_point.current;
-    strategy = save_point.strategy;
-  }
-
-private:
+ private:
   Node* head                         = nullptr;
   Node* current                      = nullptr;
   Linear_Allocator_Strategy strategy = {};
   Allocator allocator                = {};
-  u32 page_size                      = mega_bytes(1); // default
+  u64 page_size                      = mega_bytes(1); // default
 };

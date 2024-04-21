@@ -1,5 +1,6 @@
 #include "memory.hpp"
 #include <cstdlib>
+#include <cstring>
 
 Allocation_Return default_allocator_proc(Allocation_Parameters params) {
   Allocation_Return alloc_ret = {};
@@ -126,4 +127,56 @@ Allocation_Return Linear_Allocator_Strategy::realloc(void* previous, u64 prev_si
 void Linear_Allocator_Strategy::clear() {
   prev_offset = 0;
   curr_offset = 0;
+}
+
+void* Linear_Allocator::push(u64 size, u64 alignment) {
+  if (current == nullptr) {
+    auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
+    assert(allocation.result != Allocation_Info::out_of_memory);
+    head    = (Node*)allocation.memory;
+    current = head;
+    strategy.init(get_stack_ptr(current), page_size);
+  }
+
+  auto allocation = strategy.alloc(size, alignment);
+  if (allocation.memory == nullptr && allocation.result == Allocation_Info::out_of_memory) {
+    auto new_allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
+    assert(new_allocation.result != Allocation_Info::out_of_memory);
+    current->next = (Node*)new_allocation.memory;
+    current       = current->next;
+    strategy.init(get_stack_ptr(current), page_size);
+  } else {
+    return allocation.memory;
+  }
+
+  allocation = strategy.alloc(size, alignment);
+  // may need to grow page here?
+  assert(allocation.result != Allocation_Info::out_of_memory);
+  return allocation.memory;
+}
+
+// need to call destructor for some T
+void Linear_Allocator::clear() {
+  current = head;
+  strategy.init(get_stack_ptr(current), page_size);
+}
+
+void Linear_Allocator::free() {
+  while (head) {
+    auto tmp = head->next;
+    allocator.free((void*)tmp);
+    head = tmp;
+  }
+}
+
+Linear_Allocator::Linear_Allocator(u64 _page_size, Allocator _allocator) :
+    page_size{ _page_size }, allocator{ _allocator } {}
+
+Linear_Allocator::~Linear_Allocator() { free(); }
+Linear_Allocator::Save_Point Linear_Allocator::save_current() const { return { current, this, strategy }; }
+
+void Linear_Allocator::load(Save_Point save_point) {
+  assert(save_point.whoami == this);
+  current  = save_point.current;
+  strategy = save_point.strategy;
 }
