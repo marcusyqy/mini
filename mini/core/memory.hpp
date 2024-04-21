@@ -145,9 +145,7 @@ struct Linear_Allocator {
   Linear_Allocator& operator=(Linear_Allocator&& o) noexcept = delete;
 
   ~Linear_Allocator();
-
-  Linear_Allocator() = default;
-  Linear_Allocator(u64 _page_size, Allocator _allocator = {});
+  Linear_Allocator(u64 _page_size = mega_bytes(1), Allocator _allocator = {});
 
 private:
   struct Node {
@@ -156,14 +154,15 @@ private:
 
   u8* get_stack_ptr(Node* n) { return (u8*)(n + 1); }
 
+public:
   struct Save_Point {
     Node* current;
-    const Linear_Allocator* whoami;
+    Linear_Allocator* whoami;
     Linear_Allocator_Strategy strategy;
   };
 
-public:
-  Save_Point save_current() const;
+  // these suck right now.
+  Save_Point save_current();
   void load(Save_Point save_point);
 
  private:
@@ -172,4 +171,45 @@ public:
   Linear_Allocator_Strategy strategy = {};
   Allocator allocator                = {};
   u64 page_size                      = mega_bytes(1); // default
+};
+
+
+struct Temp_Linear_Allocator {
+  template <typename T>
+  T* push_no_init() {
+    return save_point.whoami->push_no_init<T>();
+  }
+
+  template <typename T>
+  T* push_array_no_init(u32 N) {
+    return save_point.whoami->push_array_no_init<T>(N);
+  }
+
+  template <typename T>
+  T* push_array_zero(u32 N) {
+    return save_point.whoami->push_array_zero<T>(N);
+  }
+
+  template <typename T>
+  T* push_zero() {
+    return save_point.whoami->push_zero<T>();
+  }
+
+  void* push(u64 size, u64 alignment) {
+    return save_point.whoami->push(size, alignment);
+  }
+
+  void clear() {
+    save_point.whoami->load(save_point);
+  }
+
+  Temp_Linear_Allocator save() {
+    return save_point.whoami->save_current();
+  }
+
+  Temp_Linear_Allocator(Linear_Allocator& allocator) : save_point(allocator.save_current()) {}
+  Temp_Linear_Allocator(Linear_Allocator::Save_Point _save_point) : save_point(_save_point) {}
+
+  // these suck right now.
+  Linear_Allocator::Save_Point save_point;
 };

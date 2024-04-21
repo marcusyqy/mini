@@ -130,14 +130,6 @@ void Linear_Allocator_Strategy::clear() {
 }
 
 void* Linear_Allocator::push(u64 size, u64 alignment) {
-  if (current == nullptr) {
-    auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
-    assert(allocation.result != Allocation_Info::out_of_memory);
-    head    = (Node*)allocation.memory;
-    current = head;
-    strategy.init(get_stack_ptr(current), page_size);
-  }
-
   auto allocation = strategy.alloc(size, alignment);
   if (allocation.memory == nullptr && allocation.result == Allocation_Info::out_of_memory) {
     auto new_allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
@@ -170,10 +162,17 @@ void Linear_Allocator::free() {
 }
 
 Linear_Allocator::Linear_Allocator(u64 _page_size, Allocator _allocator) :
-    page_size{ _page_size }, allocator{ _allocator } {}
+    page_size{ _page_size }, allocator{ _allocator } {
+  // simplify logic by adding them here.
+  auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
+  assert(allocation.result != Allocation_Info::out_of_memory);
+  head    = (Node*)allocation.memory;
+  current = head;
+  strategy.init(get_stack_ptr(current), page_size);
+}
 
 Linear_Allocator::~Linear_Allocator() { free(); }
-Linear_Allocator::Save_Point Linear_Allocator::save_current() const { return { current, this, strategy }; }
+Linear_Allocator::Save_Point Linear_Allocator::save_current() { return { current, this, strategy }; }
 
 void Linear_Allocator::load(Save_Point save_point) {
   assert(save_point.whoami == this);

@@ -1,10 +1,10 @@
 #pragma once
 #include "defs.hpp"
 #include <vulkan/vulkan.h>
+#include "core/memory.hpp"
 
 struct GLFWwindow;
 struct Device;
-struct Linear_Allocator;
 
 struct Surface {
   static constexpr auto MAX_IMAGES = 3;
@@ -27,5 +27,5 @@ struct Surface {
   s8 frame_idx  = 0;
 };
 
-Surface create_surface(Linear_Allocator& arena, Device& device, GLFWwindow* window, s16 width, s16 height);
+Surface create_surface(Temp_Linear_Allocator arena, Device& device, GLFWwindow* window, s16 width, s16 height);
 void destroy_surface(Device& device, Surface& surface);

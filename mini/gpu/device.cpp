@@ -4,6 +4,7 @@
 #include "defs.hpp"
 #include "log.hpp"
 #include <GLFW/glfw3.h>
+#include <cstring>
 
 #define DEBUG
 
@@ -35,7 +36,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT type,
     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-    [[maybe_unused]] void* user_data) noexcept {
+    void* user_data) noexcept {
+  UNUSED_VAR(user_data);
 
   const char* prepend = nullptr;
   if (type >= VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
@@ -103,7 +105,7 @@ static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
 static VkDebugReportCallbackEXT debug_report    = VK_NULL_HANDLE;
 static bool vk_debug_layers_present             = false;
 
-VkInstance init_gpu_instance(Linear_Allocator& arena) {
+VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
   VkApplicationInfo app_info  = {};
   app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext              = nullptr;
@@ -235,7 +237,7 @@ void cleanup_gpu_instance() {
   // volkFinalize();
 }
 
-Device create_device(Linear_Allocator& arena) {
+Device create_device(Temp_Linear_Allocator arena) {
   /// TODO: add maybe properties to check? For rendering, for compute...
   Device device                     = {};
   VkDevice& logical_device          = device.logical;
@@ -263,9 +265,9 @@ Device create_device(Linear_Allocator& arena) {
   features12.bufferDeviceAddress = true;
   features12.descriptorIndexing  = true;
 
+  auto scratch = arena.save();
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
-    auto save_point = arena.save_current();
     /// @TODO: revisit this.
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(gpus[i], &properties);
@@ -308,7 +310,7 @@ Device create_device(Linear_Allocator& arena) {
     u32 extension_count = 0;
     vkEnumerateDeviceExtensionProperties(gpus[i], nullptr, &extension_count, nullptr);
     assert(extension_count > 0);
-    VkExtensionProperties* available_extensions = arena.push_array_no_init<VkExtensionProperties>(extension_count);
+    VkExtensionProperties* available_extensions = scratch.push_array_no_init<VkExtensionProperties>(extension_count);
     vkEnumerateDeviceExtensionProperties(gpus[i], nullptr, &extension_count, available_extensions);
 
     u32 j = 0;
@@ -326,7 +328,7 @@ Device create_device(Linear_Allocator& arena) {
       u32 count = 0;
       vkGetPhysicalDeviceQueueFamilyProperties(gpus[i], &count, nullptr);
       assert(count > 0);
-      auto queues = arena.push_array_no_init<VkQueueFamilyProperties>(count);
+      auto queues = scratch.push_array_no_init<VkQueueFamilyProperties>(count);
       vkGetPhysicalDeviceQueueFamilyProperties(gpus[i], &count, queues);
       for (u32 j = 0; j < count; ++j) {
         if ((queues[j].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
@@ -348,8 +350,10 @@ Device create_device(Linear_Allocator& arena) {
       break;
     }
 
-    arena.load(save_point);
+    scratch.clear();
   }
+
+  scratch.clear();
 
   // nothing was selected
   if (physical_device == VK_NULL_HANDLE) {
@@ -369,6 +373,7 @@ Device create_device(Linear_Allocator& arena) {
     }
     assert(queue_family == (u32)-1);
   }
+
   arena.clear();
 
   // create a device

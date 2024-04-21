@@ -34,7 +34,7 @@ static void swapchain_acquire_next_image(Swapchain& swapchain) {
 
 #endif
 
-static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* device, Surface* surface) {
+static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device* device, Surface* surface) {
   const auto old_num_images             = surface->num_images;
   VkSurfaceCapabilitiesKHR capabilities = {};
   VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical, surface->surface, &capabilities));
@@ -195,7 +195,7 @@ static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* de
   // swapchain_acquire_next_image(swapchain);
 }
 
-Surface create_surface(Linear_Allocator& arena, Device& device, GLFWwindow* window, s16 width, s16 height) {
+Surface create_surface(Temp_Linear_Allocator arena, Device& device, GLFWwindow* window, s16 width, s16 height) {
   Surface surface;
   surface.surface = platform_create_vk_surface(window);
 
@@ -222,6 +222,6 @@ void destroy_surface(Device& device, Surface& surface) {
   }
   vkDestroySwapchainKHR(device.logical, surface.swapchain, nullptr);
 
-  static_cast<void>(device);
+  UNUSED_VAR(device);
   platform_destroy_vk_surface(surface.surface);
 }

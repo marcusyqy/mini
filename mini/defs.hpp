@@ -62,3 +62,5 @@ Defer<Fn> operator+(Defer_Helper, Fn&& fn) {
 
 #define is_power_of_two(X) (((X) & ((X)-1)) == 0)
 #define ARRAY_SIZE(X)      (sizeof(X) / sizeof(X[0]))
+
+#define UNUSED_VAR(x) static_cast<void>(x)
