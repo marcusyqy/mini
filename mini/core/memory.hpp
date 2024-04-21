@@ -1,7 +1,6 @@
 #pragma once
 #include "defs.hpp"
 #include <cassert>
-#include <memory>
 
 template <typename V, typename T = s32>
 struct Relative_Pointer {
@@ -57,18 +56,6 @@ public:
     return (VV*)raw();
   }
 };
-
-namespace detail {
-
-struct Destructor_Node {
-  void* ptr;
-  void (*destruct)(void*, u32 size);
-
-  Destructor_Node* next;
-  u32 size;
-};
-
-} // namespace detail
 
 enum struct Allocation_Instruction { alloc, resize, free, alloc_no_zero };
 
@@ -198,7 +185,7 @@ struct Linear_Allocator {
 
   Linear_Allocator() = default;
   Linear_Allocator(u32 _page_size, Allocator _allocator = {}) : page_size{ _page_size }, allocator{ _allocator } {
-    assert(is_power_of_two(page_size));
+    // assert(is_power_of_two(page_size));
   }
 
 

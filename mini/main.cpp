@@ -8,7 +8,8 @@
 
 #include "embed/roboto.font"
 
-#include "draw.hpp"
+#include "gpu/device.hpp"
+#include "gpu/surface.hpp"
 #include "log.hpp"
 #include <vulkan/vulkan.h>
 
@@ -18,6 +19,10 @@ static void glfw_error_callback(int error, const char* description) {
 
 int main(int, char**) {
   log_info("Hello world from %s!!", "Mini Engine");
+
+// put some allocators here
+  Linear_Allocator frame_allocator = {mega_bytes(20)};
+  Linear_Allocator temp_allocator = {mega_bytes(20)};
 
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) return 1;
@@ -33,8 +38,8 @@ int main(int, char**) {
     return 1;
   }
 
-  draw::setup_vulkan();
-  defer { draw::cleanup_vulkan(); };
+  init_gpu_instance(temp_allocator);
+  defer { cleanup_gpu_instance(); };
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -57,9 +62,14 @@ int main(int, char**) {
   ImGui_ImplGlfw_InitForVulkan(window, true);
   defer { ImGui_ImplGlfw_Shutdown(); };
 
-  auto vk_win = draw::create_surface(window);
-  defer { draw::destroy_surface(vk_win); };
-  log_info("made it here maybe");
+  int w, h; 
+  glfwGetFramebufferSize(window, &w, &h);
+
+  auto device = create_device(temp_allocator);
+  defer { destroy_device(device); };
+
+  auto surface = create_surface(temp_allocator, device, window, w, h);
+  defer { destroy_surface(device, surface); };
 
   // Load Fonts
   ImFontConfig font_config{};
@@ -87,11 +97,12 @@ int main(int, char**) {
     // them from your application based on those two flags.
     glfwPollEvents();
 
-    draw::new_frame(vk_win);
+    // draw::new_frame(vk_win);
 
     // main program handled here(?)
 
     // Start the Dear ImGui frame
+    #if 0
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
@@ -135,22 +146,23 @@ int main(int, char**) {
     ImGui::Render();
     ImDrawData* main_draw_data   = ImGui::GetDrawData();
     const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
-    draw::set_clear_color(
-        vk_win,
-        clear_color.x * clear_color.w,
-        clear_color.y * clear_color.w,
-        clear_color.z * clear_color.w,
-        clear_color.w);
+    // draw::set_clear_color(
+    //     vk_win,
+    //     clear_color.x * clear_color.w,
+    //     clear_color.y * clear_color.w,
+    //     clear_color.z * clear_color.w,
+    //     clear_color.w);
 
-    if (!main_is_minimized) draw::render_frame(vk_win, main_draw_data);
+    // if (!main_is_minimized) draw::render_frame(vk_win, main_draw_data);
 
     // Update and Render additional Platform Windows
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
       ImGui::UpdatePlatformWindows();
       ImGui::RenderPlatformWindowsDefault();
     }
+    #endif
 
-    if (!main_is_minimized) draw::present_frame(vk_win);
+    // if (!main_is_minimized) draw::present_frame(vk_win);
   }
 
   return 0;

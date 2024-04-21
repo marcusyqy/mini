@@ -2,6 +2,7 @@
 #include "common.hpp"
 #include "device.hpp"
 #include <GLFW/glfw3.h>
+#include "core/common.hpp"
 
 #if 0 // TODO
 static void swapchain_acquire_next_image(Swapchain& swapchain) {
@@ -64,7 +65,7 @@ static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* de
   s16 width  = surface->width;
   s16 height = surface->height;
 
-  if (capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
+  if (capabilities.currentExtent.width != UINT32_MAX) {
     width  = capabilities.currentExtent.width;
     height = capabilities.currentExtent.height;
   }
@@ -113,11 +114,11 @@ static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* de
       if (mode == VK_PRESENT_MODE_MAILBOX_KHR) chosen_present_mode = mode;
   }*/
 
-  constexpr auto desired_image_count = 3;
-  u32 image_count                    = desired_image_count;
+  constexpr u32 desired_image_count = 3;
+  const auto image_count                    = clamp(desired_image_count, capabilities.minImageCount, capabilities.maxImageCount);
   // clamp here.
-  if (image_count < capabilities.minImageCount) image_count = capabilities.minImageCount;
-  if (image_count > capabilities.maxImageCount) image_count = capabilities.maxImageCount;
+  // if (image_count < capabilities.minImageCount) image_count = capabilities.minImageCount;
+  // if (image_count > capabilities.maxImageCount) image_count = capabilities.maxImageCount;
 
   // Find a supported composite type.
   VkCompositeAlphaFlagBitsKHR composite = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -227,7 +228,6 @@ Surface create_surface(Linear_Allocator& arena, Device& device, GLFWwindow* wind
   vkGetPhysicalDeviceSurfaceSupportKHR(device.physical, device.queue_family, surface.surface, &res);
   assert(res == VK_TRUE);
 
-  /// @TODO: swapchain not initialized
   create_or_reinitialize_swapchain(arena, &device, &surface);
   return surface;
 }
