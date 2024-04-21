@@ -104,6 +104,9 @@ struct Linear_Allocator_Strategy {
   void clear();
 };
 
+
+struct Temp_Linear_Allocator;
+
 struct Linear_Allocator {
 
   template <typename T>
@@ -157,13 +160,12 @@ private:
 public:
   struct Save_Point {
     Node* current;
-    Linear_Allocator* whoami;
+    Linear_Allocator* allocator;
     Linear_Allocator_Strategy strategy;
   };
 
-  // these suck right now.
-  Save_Point save_current();
-  void load(Save_Point save_point);
+  Temp_Linear_Allocator save();
+  void load(Temp_Linear_Allocator save_point);
 
  private:
   Node* head                         = nullptr;
@@ -177,37 +179,37 @@ public:
 struct Temp_Linear_Allocator {
   template <typename T>
   T* push_no_init() {
-    return save_point.whoami->push_no_init<T>();
+    return save_point.allocator->push_no_init<T>();
   }
 
   template <typename T>
   T* push_array_no_init(u32 N) {
-    return save_point.whoami->push_array_no_init<T>(N);
+    return save_point.allocator->push_array_no_init<T>(N);
   }
 
   template <typename T>
   T* push_array_zero(u32 N) {
-    return save_point.whoami->push_array_zero<T>(N);
+    return save_point.allocator->push_array_zero<T>(N);
   }
 
   template <typename T>
   T* push_zero() {
-    return save_point.whoami->push_zero<T>();
+    return save_point.allocator->push_zero<T>();
   }
 
   void* push(u64 size, u64 alignment) {
-    return save_point.whoami->push(size, alignment);
+    return save_point.allocator->push(size, alignment);
   }
 
   void clear() {
-    save_point.whoami->load(save_point);
+    save_point.allocator->load(save_point);
   }
 
   Temp_Linear_Allocator save() {
-    return save_point.whoami->save_current();
+    return save_point.allocator->save();
   }
 
-  Temp_Linear_Allocator(Linear_Allocator& allocator) : save_point(allocator.save_current()) {}
+  Temp_Linear_Allocator(Linear_Allocator& allocator) : Temp_Linear_Allocator(allocator.save()) {}
   Temp_Linear_Allocator(Linear_Allocator::Save_Point _save_point) : save_point(_save_point) {}
 
   // these suck right now.

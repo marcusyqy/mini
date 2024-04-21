@@ -10,6 +10,7 @@
 struct GLFWwindow;
 
 struct Device {
+  VkInstance instance       = VK_NULL_HANDLE; // for convenience
   VkDevice logical          = VK_NULL_HANDLE;
   VkPhysicalDevice physical = VK_NULL_HANDLE;
   VkQueue queue             = VK_NULL_HANDLE;

@@ -172,10 +172,11 @@ Linear_Allocator::Linear_Allocator(u64 _page_size, Allocator _allocator) :
 }
 
 Linear_Allocator::~Linear_Allocator() { free(); }
-Linear_Allocator::Save_Point Linear_Allocator::save_current() { return { current, this, strategy }; }
 
-void Linear_Allocator::load(Save_Point save_point) {
-  assert(save_point.whoami == this);
-  current  = save_point.current;
-  strategy = save_point.strategy;
+Temp_Linear_Allocator Linear_Allocator::save() { return Save_Point{ current, this, strategy }; }
+
+void Linear_Allocator::load(Temp_Linear_Allocator temp) {
+  assert(temp.save_point.allocator == this);
+  current  = temp.save_point.current;
+  strategy = temp.save_point.strategy;
 }
