@@ -58,16 +58,6 @@ public:
   }
 };
 
-// template<typename T>
-// struct Pointer : Relative_Pointer<T> {
-
-// };
-
-// template<>
-// struct Pointer<void> { // normal pointer to allow some templatey stuff?
-
-// };
-
 namespace detail {
 
 struct Destructor_Node {
@@ -80,85 +70,81 @@ struct Destructor_Node {
 
 } // namespace detail
 
-enum struct Allocation_Instruction { alloc, resize, free };
+enum struct Allocation_Instruction { alloc, resize, free, alloc_no_zero };
 
-struct Allocator_Proc {
-  using _Alloc_Proc =
-      void* (*)(Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment);
+enum struct Allocation_Info {
+  none = 0,
+  relocated_memory, // for realloc
+  out_of_bounds,    // for realloc & free
+  out_of_memory,
+};
 
-  _Alloc_Proc _alloc_proc =
-      +[](Allocation_Instruction alloc_instruction, void* allocator, void* memory, u32 size, u32 alignment) -> void* {
-    static_cast<void>(alignment);
-    static_cast<void>(allocator);
-    switch (alloc_instruction) {
-      case Allocation_Instruction::alloc: return ::malloc(size);
-      case Allocation_Instruction::free: ::free(memory); return nullptr;
-      case Allocation_Instruction::resize: return ::realloc(memory, size);
-    }
-    assert(false);
-    return nullptr;
-  };
-  void* _allocator = nullptr;
+struct Allocation_Parameters {
+  Allocation_Instruction alloc_instruction;
+  void* user_ptr;
+  void* memory;
+  u64 size;
+  u64 alignment;
+};
 
-  // TODO: change this to allocator instead of allocator proc
-  void* allocate(u32 size, u32 alignment) {
-    assert(_alloc_proc);
-    return _alloc_proc(Allocation_Instruction::alloc, _allocator, nullptr, size, alignment);
-  }
+struct Allocation_Return {
+  void* memory;
+  Allocation_Info result;
+};
 
-  void free(void* memory) {
-    assert(_alloc_proc);
-    _alloc_proc(Allocation_Instruction::free, _allocator, memory, 0, 0);
-  }
+Allocation_Return default_allocator_proc(Allocation_Parameters params);
 
-  void* realloc(void* memory, u32 size, u32 alignment) {
-    assert(_alloc_proc);
-    _alloc_proc(Allocation_Instruction::resize, _allocator, memory, size, alignment);
-  }
+struct Allocator {
+  using Allocator_Proc      = Allocation_Return (*)(Allocation_Parameters params);
+  Allocator_Proc alloc_proc = default_allocator_proc;
+  void* user_ptr            = nullptr;
+
+  Allocation_Return allocate(u64 size, u64 alignment);
+  Allocation_Return allocate_no_zero(u32 size, u32 alignment);
+  Allocation_Info free(void* memory);
+  Allocation_Return realloc(void* memory, u32 size, u32 alignment);
+};
+
+struct Linear_Allocator_Strategy {
+  u8* buf;
+  u64 size;
+  u64 curr_offset;
+  u64 prev_offset;
+
+  void init(u8* _buf, u64 _size);
+  Allocation_Return alloc(u64 size, u64 alignment);
+  Allocation_Return realloc(void* previous, u64 prev_size, u64 size, u64 alignment);
+  void clear();
 };
 
 struct Linear_Allocator {
   // this needs to be specific for T
-  u8* push(u32 size, u32 alignment) {
-    assert(is_power_of_two(alignment));
-    Node** node = &head;
+  void* push(u64 size, u64 alignment) {
 
-    // go through all the pages.
-    while (*node) {
-      auto& n  = *node;
-      auto buf = (uintptr_t)get_stack_ptr(n);
-      auto p   = buf + (uintptr_t)n->current;
-      auto a   = (uintptr_t)alignment;
-      auto mod = p & (a - 1);
-      if (mod != 0) {
-        p += a - mod;
-      }
-      auto result = p + (uintptr_t)size - buf;
-      if (result < page_size) {
-        assert(result >= 0);
-        n->current = (u32)result;
-        return (u8*)p;
-      }
-      node = &n->next;
+    if(current == nullptr) {
+      auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
+      assert(allocation.result != Allocation_Info::out_of_memory);
+      head = (Node*)allocation.memory;
+      current = head;
+      strategy.init((u8*)get_stack_ptr(current), page_size);
+    } 
+
+    auto allocation = strategy.alloc(size, alignment);
+    // current page no memory.
+    if(allocation.memory == nullptr && allocation.result == Allocation_Info::out_of_memory) {
+      auto new_allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
+      assert(new_allocation.result != Allocation_Info::out_of_memory);
+      current->next = (Node*)new_allocation.memory;
+      current = current->next;
+      strategy.init((u8*)get_stack_ptr(current), page_size);
+    } else {
+      return allocation.memory;
     }
 
-    *node = (Node*)alloc_proc.allocate(sizeof(Node) + page_size, alignof(Node));
-    assert(*node);
-
-    auto& n = *node;
-    memset(n, 0, sizeof(Node)); // doesn't memset the bytes.
-
-    auto buf = (uintptr_t)get_stack_ptr(n);
-    auto p   = buf + (uintptr_t)n->current;
-    auto a   = (uintptr_t)alignment;
-    auto mod = p & (a - 1);
-    if (mod != 0) p += a - mod;
-
-    auto result = p + (uintptr_t)size - buf;
-    assert(result < page_size);
-    assert(result >= 0);
-    n->current = (u32)result;
-    return (u8*)p;
+    // do it again
+    allocation = strategy.alloc(size, alignment);
+    assert(allocation.result != Allocation_Info::out_of_memory); // may need to grow page here?
+    return allocation.memory;
   }
 
   template <typename T>
@@ -175,60 +161,28 @@ struct Linear_Allocator {
     return (T*)p;
   }
 
-  template <typename T, typename... Args>
-  T* push_array(u32 N, Args&&... args) {
-    auto p   = push(sizeof(T) * N, alignof(T));
-    auto ret = ::new (p) T{ std::forward<Args&&>(args)... };
-    if constexpr (!std::is_trivially_destructible_v<T>) {
-      auto node = (detail::Destructor_Node*)push(sizeof(detail::Destructor_Node), alignof(detail::Destructor_Node));
-      node->ptr = p;
-      node->destruct  = +[](void* ptr, u32 size) { std::destroy_n((T*)ptr, size); };
-      node->size      = N;
-      node->next      = destructor_list;
-      destructor_list = node;
-    }
-    return ret;
+  template <typename T>
+  T* push_array_zero(u32 N) {
+    auto p = push_array_no_init<T>(N);
+    memset(p, 0, sizeof(T) * N);
+    static_assert(std::is_trivially_destructible_v<T>, "Removing all destructible code.");
+    return (T*)p;
   }
 
-  template <typename T, typename... Args>
-  T* push(Args&&... args) {
-    auto p   = push(sizeof(T), alignof(T));
-    auto ret = ::new (p) T{ std::forward<Args&&>(args)... };
-    if constexpr (!std::is_trivially_destructible_v<T>) {
-      auto node = (detail::Destructor_Node*)push(sizeof(detail::Destructor_Node), alignof(detail::Destructor_Node));
-      node->ptr = p;
-      node->destruct  = +[](void* ptr, u32) { std::destroy_at((T*)ptr); };
-      node->size      = 0;
-      node->next      = destructor_list;
-      destructor_list = node;
-    }
-    return ret;
+  template <typename T>
+  T* push_zero() {
+    auto p = push(sizeof(T), alignof(T));
+    ::memset(p, 0, sizeof(T));
+    return (T*)p;
   }
 
   // need to call destructor for some T
-  void clear() {
-    auto tmp = head;
-
-    while (tmp) {
-      tmp->current = 0;
-      tmp          = tmp->next;
-    }
-
-    while (destructor_list) {
-      destructor_list->destruct(destructor_list->ptr, destructor_list->size);
-      destructor_list = destructor_list->next;
-    }
-  }
+  void clear() { current = head; }
 
   void free() {
-    while (destructor_list) {
-      destructor_list->destruct(destructor_list->ptr, destructor_list->size);
-      destructor_list = destructor_list->next;
-    }
-
     while (head) {
       auto tmp = head->next;
-      alloc_proc.free((void*)tmp);
+      allocator.free((void*)tmp); // maybe check if out of bounds
       head = tmp;
     }
   }
@@ -241,23 +195,20 @@ struct Linear_Allocator {
   ~Linear_Allocator() { free(); }
 
   Linear_Allocator() = default;
-  Linear_Allocator(u32 _page_size, Allocator_Proc _alloc_proc = {}) :
-      page_size{ _page_size }, alloc_proc{ _alloc_proc } {
+  Linear_Allocator(u32 _page_size, Allocator _allocator = {}) : page_size{ _page_size }, allocator{ _allocator } {
     assert(is_power_of_two(page_size));
   }
 
 private:
   struct Node {
-    Node* next  = nullptr;
-    u32 current = {}; // one way we can do it here is to make current be shared across
-    // wasting 4 bytes of stuff here.
+    Node* next = nullptr;
   };
-
   Node* get_stack_ptr(Node* n) { return n + 1; }
 
 private:
-  Node* head                               = nullptr;
-  detail::Destructor_Node* destructor_list = nullptr;
-  Allocator_Proc alloc_proc                = {};
-  u32 page_size                            = mega_bytes(1); // default
+  Node* head                         = nullptr;
+  Node* current                      = nullptr;
+  Linear_Allocator_Strategy strategy = {};
+  Allocator allocator                = {};
+  u32 page_size                      = mega_bytes(1); // default
 };

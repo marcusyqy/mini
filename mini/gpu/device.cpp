@@ -400,7 +400,6 @@ Device create_device(Linear_Allocator& arena) {
   arena.clear();
 
   // volkLoadDevice(device);
-
   return device;
 }
 
@@ -417,4 +416,9 @@ VkSurfaceKHR platform_create_vk_surface(GLFWwindow* window) {
   // vk_check(vkCreateWin32SurfaceKHR(instance, &create_info, allocator_callback, &surface));
   VK_CHECK(glfwCreateWindowSurface(instance, window, allocator, &surface));
   return surface;
+}
+
+
+void platform_destroy_vk_surface(VkSurfaceKHR surface) {
+  vkDestroySurfaceKHR(instance, surface, allocator);
 }

@@ -24,3 +24,4 @@ void destroy_device(Device device);
 
 /// create surface for now.
 VkSurfaceKHR platform_create_vk_surface(GLFWwindow* window);
+void platform_destroy_vk_surface(VkSurfaceKHR surface);

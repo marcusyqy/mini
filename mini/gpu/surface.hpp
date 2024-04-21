@@ -6,18 +6,28 @@ struct GLFWwindow;
 struct Device;
 struct Linear_Allocator;
 
+
+
 struct Surface {
-  VkSurfaceKHR surface;
-  VkSwapchainKHR swapchain;
+  static constexpr auto MAX_IMAGES = 3;
+
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+
+  VkSurfaceFormatKHR format = {};
+
+  // FRAME STUFF 
+  VkImageView image_views[MAX_IMAGES];
+  VkSemaphore image_avail[MAX_IMAGES];
+  VkSemaphore render_done[MAX_IMAGES];
 
   // this should be enough
-  s16 width;
-  s16 height;
+  s16 width = -1;
+  s16 height = -1;
 
-  s8 frame_idx;
-
-  void present();
+  s8 num_images = 0;
+  s8 frame_idx = 0;
 };
 
-Surface create_surface(Linear_Allocator& arena, Device& device, GLFWwindow* window);
+Surface create_surface(Linear_Allocator& arena, Device& device, GLFWwindow* window, s16 width, s16 height);
 void destroy_surface(Device& device, Surface& surface);

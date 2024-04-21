@@ -85,7 +85,9 @@ ImGui_ImplVulkanH_Window main_window_imgui_impl = {};
 // I think you are only able to create one here because we need to manage people's expectations.
 Window create_surface(GLFWwindow* window) {
   // Create Window Surface
-  Surface s            = ::create_surface(arena, device, window);
+  int w, h;
+  glfwGetFramebufferSize(window, &w, &h);
+  Surface s            = ::create_surface(arena, device, window, w, h);
   VkSurfaceKHR surface = s.surface;
 
   // Create Framebuffers

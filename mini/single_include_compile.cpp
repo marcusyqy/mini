@@ -2,6 +2,8 @@
 // #include "embed/volk.mini"
 #include "embed/vma.mini"
 
+#include "core/memory.cpp"
+
 // gpu files
 #include "gpu/common.cpp"
 #include "gpu/device.cpp"

@@ -64,7 +64,7 @@ set release_links="shaderc_shared.lib"
 set compile_flags=
 set external_includes_dep= -external:I..\extra\imgui -external:I..\extra\glfw\include -external:I..\extra\adapter -external:I%VULKAN_SDK%\Include -external:I..\extra\volk -external:I..\extra\glm -external:I..\extra\vma 
 set include_deps= %external_includes_dep% -I..\mini\ 
-set common_flags= %include_deps% -nologo -MP -FC -Zi -Zc:__cplusplus -std:c++17 -wd4530 -utf-8 -WX -W3 -external:W0 -EHsc
+set common_flags= %include_deps% -nologo -MP -FC -Zi -Zc:__cplusplus -wd4530 -utf-8 -WX -W3 -external:W0 -EHsc -std:c++17
 
 if "%debug%"=="1" set compile_flags= %debug_flags% %common_flags%
 if "%release%"=="1" set compile_flags= %release_flags% %common_flags%
