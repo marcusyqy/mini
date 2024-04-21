@@ -12,17 +12,15 @@ struct String {
   s32 size;
 };
 
-
-
-template<typename T>
+template <typename T>
 struct Disregard_Type_Impl {
   using type = T;
 };
 
-template<typename T>
+template <typename T>
 using Disregard_Type = typename Disregard_Type_Impl<T>::type;
 
-template<typename T>
+template <typename T>
 T clamp(T val, Disregard_Type<T> min, Disregard_Type<T> max) {
   return val < min ? min : (val > max ? max : val);
 }

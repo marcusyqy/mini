@@ -249,19 +249,19 @@ Device create_device(Linear_Allocator& arena) {
   auto gpus = arena.push_array_no_init<VkPhysicalDevice>(gpu_count);
   VK_CHECK(vkEnumeratePhysicalDevices(instance, &gpu_count, gpus));
 
-  constexpr auto required_version = VK_API_VERSION_1_3; 
+  constexpr auto required_version = VK_API_VERSION_1_3;
 
-  //vulkan 1.3 features
+  // vulkan 1.3 features
   VkPhysicalDeviceVulkan13Features features13{};
-  features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
   features13.dynamicRendering = true;
   features13.synchronization2 = true;
 
-  //vulkan 1.2 features
+  // vulkan 1.2 features
   VkPhysicalDeviceVulkan12Features features12{};
-  features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  features12.sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
   features12.bufferDeviceAddress = true;
-  features12.descriptorIndexing = true;
+  features12.descriptorIndexing  = true;
 
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
@@ -269,7 +269,7 @@ Device create_device(Linear_Allocator& arena) {
     /// @TODO: revisit this.
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(gpus[i], &properties);
-    if(properties.apiVersion < required_version) continue;
+    if (properties.apiVersion < required_version) continue;
 
     // Rendering features here.
     VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_parameters_feature = {};
@@ -277,19 +277,19 @@ Device create_device(Linear_Allocator& arena) {
     shader_draw_parameters_feature.pNext = nullptr;
     shader_draw_parameters_feature.shaderDrawParameters = VK_TRUE;
 
-    //vulkan 1.2 feature
+    // vulkan 1.2 feature
     VkPhysicalDeviceVulkan12Features features12{};
-    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.bufferDeviceAddress = VK_TRUE;
-    features12.descriptorIndexing = VK_TRUE;
-    features12.pNext = &shader_draw_parameters_feature;
+    features12.descriptorIndexing  = VK_TRUE;
+    features12.pNext               = &shader_draw_parameters_feature;
 
-    //vulkan 1.3 features
+    // vulkan 1.3 features
     VkPhysicalDeviceVulkan13Features features13{};
-    features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     features13.dynamicRendering = true;
     features13.synchronization2 = VK_TRUE;
-    features13.pNext = &features12;
+    features13.pNext            = &features12;
 
     VkPhysicalDeviceFeatures2 features = {};
     features.sType                     = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -421,7 +421,4 @@ VkSurfaceKHR platform_create_vk_surface(GLFWwindow* window) {
   return surface;
 }
 
-
-void platform_destroy_vk_surface(VkSurfaceKHR surface) {
-  vkDestroySurfaceKHR(instance, surface, allocator);
-}
+void platform_destroy_vk_surface(VkSurfaceKHR surface) { vkDestroySurfaceKHR(instance, surface, allocator); }

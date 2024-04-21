@@ -1,8 +1,8 @@
 #include "surface.hpp"
 #include "common.hpp"
+#include "core/common.hpp"
 #include "device.hpp"
 #include <GLFW/glfw3.h>
-#include "core/common.hpp"
 
 #if 0 // TODO
 static void swapchain_acquire_next_image(Swapchain& swapchain) {
@@ -32,26 +32,6 @@ static void swapchain_acquire_next_image(Swapchain& swapchain) {
   swapchain.image_avail[swapchain.current_frame]       = semaphore;
 }
 
-static void free_swapchain(Swapchain& swapchain) {
-  vkDeviceWaitIdle(gpu.logical);
-  for (u32 i = 0; i < swapchain.num_images; ++i) {
-    vkDestroyImageView(gpu.logical, swapchain.image_views[i], nullptr);
-    vkDestroySemaphore(gpu.logical, swapchain.render_done[i], nullptr);
-    vkDestroySemaphore(gpu.logical, swapchain.image_avail[i], nullptr);
-  }
-  for (size_t i = 0; i < swapchain.semaphore_size; ++i) {
-    vkDestroySemaphore(gpu.logical, swapchain.semaphore_pool[i], nullptr);
-  }
-  swapchain.semaphore_size = 0;
-
-  if (swapchain.handle) {
-    vkDestroySwapchainKHR(gpu.logical, swapchain.handle, nullptr);
-  }
-  if (swapchain.surface) {
-    vkDestroySurfaceKHR(instance, swapchain.surface, nullptr);
-  }
-}
-
 #endif
 
 static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* device, Surface* surface) {
@@ -71,7 +51,7 @@ static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* de
   }
 
   if (width == surface->width && height == surface->height) return;
-  
+
   surface->width  = width;
   surface->height = height;
 
@@ -115,7 +95,7 @@ static void create_or_reinitialize_swapchain(Linear_Allocator& arena, Device* de
   }*/
 
   constexpr u32 desired_image_count = 3;
-  const auto image_count                    = clamp(desired_image_count, capabilities.minImageCount, capabilities.maxImageCount);
+  const auto image_count = clamp(desired_image_count, capabilities.minImageCount, capabilities.maxImageCount);
   // clamp here.
   // if (image_count < capabilities.minImageCount) image_count = capabilities.minImageCount;
   // if (image_count > capabilities.maxImageCount) image_count = capabilities.maxImageCount;

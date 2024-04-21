@@ -50,7 +50,7 @@ Allocation_Info Allocator::free(void* memory) {
   params.alloc_instruction     = Allocation_Instruction::free;
   params.user_ptr              = user_ptr;
   params.memory                = memory;
-  auto allocation_info = alloc_proc(params);
+  auto allocation_info         = alloc_proc(params);
   return allocation_info.result;
 }
 
@@ -66,8 +66,8 @@ Allocation_Return Allocator::realloc(void* memory, u32 size, u32 alignment) {
 }
 
 void Linear_Allocator_Strategy::init(u8* _buf, u64 _size) {
-  buf = _buf;
-  size = _size;
+  buf         = _buf;
+  size        = _size;
   prev_offset = 0;
   curr_offset = 0;
 }

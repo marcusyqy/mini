@@ -20,9 +20,9 @@ static void glfw_error_callback(int error, const char* description) {
 int main(int, char**) {
   log_info("Hello world from %s!!", "Mini Engine");
 
-// put some allocators here
-  Linear_Allocator frame_allocator = {mega_bytes(20)};
-  Linear_Allocator temp_allocator = {mega_bytes(20)};
+  // put some allocators here
+  Linear_Allocator frame_allocator = { mega_bytes(20) };
+  Linear_Allocator temp_allocator  = { mega_bytes(20) };
 
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) return 1;
@@ -62,7 +62,7 @@ int main(int, char**) {
   ImGui_ImplGlfw_InitForVulkan(window, true);
   defer { ImGui_ImplGlfw_Shutdown(); };
 
-  int w, h; 
+  int w, h;
   glfwGetFramebufferSize(window, &w, &h);
 
   auto device = create_device(temp_allocator);
@@ -97,12 +97,12 @@ int main(int, char**) {
     // them from your application based on those two flags.
     glfwPollEvents();
 
-    // draw::new_frame(vk_win);
+// draw::new_frame(vk_win);
 
-    // main program handled here(?)
+// main program handled here(?)
 
-    // Start the Dear ImGui frame
-    #if 0
+// Start the Dear ImGui frame
+#if 0
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
@@ -160,7 +160,7 @@ int main(int, char**) {
       ImGui::UpdatePlatformWindows();
       ImGui::RenderPlatformWindowsDefault();
     }
-    #endif
+#endif
 
     // if (!main_is_minimized) draw::present_frame(vk_win);
   }

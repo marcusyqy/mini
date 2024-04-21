@@ -107,21 +107,21 @@ struct Linear_Allocator_Strategy {
 struct Linear_Allocator {
   // this needs to be specific for T
   void* push(u64 size, u64 alignment) {
-    if(current == nullptr) {
+    if (current == nullptr) {
       auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
       assert(allocation.result != Allocation_Info::out_of_memory);
-      head = (Node*)allocation.memory;
+      head    = (Node*)allocation.memory;
       current = head;
       strategy.init(get_stack_ptr(current), page_size);
-    } 
+    }
 
     auto allocation = strategy.alloc(size, alignment);
     // current page no memory.
-    if(allocation.memory == nullptr && allocation.result == Allocation_Info::out_of_memory) {
+    if (allocation.memory == nullptr && allocation.result == Allocation_Info::out_of_memory) {
       auto new_allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
       assert(new_allocation.result != Allocation_Info::out_of_memory);
       current->next = (Node*)new_allocation.memory;
-      current = current->next;
+      current       = current->next;
       strategy.init(get_stack_ptr(current), page_size);
     } else {
       return allocation.memory;
@@ -163,8 +163,8 @@ struct Linear_Allocator {
   }
 
   // need to call destructor for some T
-  void clear() { 
-    current = head; 
+  void clear() {
+    current = head;
     strategy.init(get_stack_ptr(current), page_size);
   }
 
@@ -188,7 +188,6 @@ struct Linear_Allocator {
     // assert(is_power_of_two(page_size));
   }
 
-
 private:
   struct Node {
     Node* next = nullptr;
@@ -198,18 +197,16 @@ private:
 
   struct Save_Point {
     Node* current;
-    const Linear_Allocator* whoami; 
+    const Linear_Allocator* whoami;
     Linear_Allocator_Strategy strategy;
   };
 
 public:
-  Save_Point save_current() const {
-    return { current, this, strategy };
-  }
+  Save_Point save_current() const { return { current, this, strategy }; }
 
   void load(Save_Point save_point) {
     assert(save_point.whoami == this);
-    current = save_point.current;
+    current  = save_point.current;
     strategy = save_point.strategy;
   }
 
