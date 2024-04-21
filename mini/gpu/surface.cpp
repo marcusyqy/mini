@@ -228,19 +228,19 @@ Surface create_surface(Linear_Allocator& arena, Device& device, GLFWwindow* wind
   assert(res == VK_TRUE);
 
   /// @TODO: swapchain not initialized
-  // create_or_reinitialize_swapchain(arena, &device, &surface);
+  create_or_reinitialize_swapchain(arena, &device, &surface);
   return surface;
 }
 
 void destroy_surface(Device& device, Surface& surface) {
-  // vkDeviceWaitIdle(device.logical);
-  // // destroy swapchain resources
-  // for (u8 i = 0; i < surface.num_images; ++i) {
-  //   vkDestroyImageView(device.logical, surface.image_views[i], nullptr);
-  //   vkDestroySemaphore(device.logical, surface.image_avail[i], nullptr);
-  //   vkDestroySemaphore(device.logical, surface.render_done[i], nullptr);
-  // }
-  // vkDestroySwapchainKHR(device.logical, surface.swapchain, nullptr);
+  vkDeviceWaitIdle(device.logical);
+  // destroy swapchain resources
+  for (u8 i = 0; i < surface.num_images; ++i) {
+    vkDestroyImageView(device.logical, surface.image_views[i], nullptr);
+    vkDestroySemaphore(device.logical, surface.image_avail[i], nullptr);
+    vkDestroySemaphore(device.logical, surface.render_done[i], nullptr);
+  }
+  vkDestroySwapchainKHR(device.logical, surface.swapchain, nullptr);
 
   static_cast<void>(device);
   platform_destroy_vk_surface(surface.surface);

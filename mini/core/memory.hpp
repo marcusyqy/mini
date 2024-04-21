@@ -120,13 +120,12 @@ struct Linear_Allocator_Strategy {
 struct Linear_Allocator {
   // this needs to be specific for T
   void* push(u64 size, u64 alignment) {
-
     if(current == nullptr) {
       auto allocation = allocator.allocate(sizeof(Node) + page_size, alignof(Node));
       assert(allocation.result != Allocation_Info::out_of_memory);
       head = (Node*)allocation.memory;
       current = head;
-      strategy.init((u8*)get_stack_ptr(current), page_size);
+      strategy.init(get_stack_ptr(current), page_size);
     } 
 
     auto allocation = strategy.alloc(size, alignment);
@@ -136,7 +135,7 @@ struct Linear_Allocator {
       assert(new_allocation.result != Allocation_Info::out_of_memory);
       current->next = (Node*)new_allocation.memory;
       current = current->next;
-      strategy.init((u8*)get_stack_ptr(current), page_size);
+      strategy.init(get_stack_ptr(current), page_size);
     } else {
       return allocation.memory;
     }
@@ -177,12 +176,15 @@ struct Linear_Allocator {
   }
 
   // need to call destructor for some T
-  void clear() { current = head; }
+  void clear() { 
+    current = head; 
+    strategy.init(get_stack_ptr(current), page_size);
+  }
 
   void free() {
     while (head) {
       auto tmp = head->next;
-      allocator.free((void*)tmp); // maybe check if out of bounds
+      allocator.free((void*)tmp);
       head = tmp;
     }
   }
@@ -204,7 +206,8 @@ private:
   struct Node {
     Node* next = nullptr;
   };
-  Node* get_stack_ptr(Node* n) { return n + 1; }
+
+  u8* get_stack_ptr(Node* n) { return (u8*)(n + 1); }
 
   struct Save_Point {
     Node* current;
@@ -218,7 +221,6 @@ public:
   }
 
   void load(Save_Point save_point) {
-    // maybe we need to check debug or something
     assert(save_point.whoami == this);
     current = save_point.current;
     strategy = save_point.strategy;
