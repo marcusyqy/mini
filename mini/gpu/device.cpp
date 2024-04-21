@@ -241,6 +241,7 @@ Device create_device(Temp_Linear_Allocator arena) {
   /// TODO: add maybe properties to check? For rendering, for compute...
   Device device   = {};
   device.instance = instance;
+  device.allocator = allocator;
 
   VkDevice& logical_device          = device.logical;
   VkPhysicalDevice& physical_device = device.physical;

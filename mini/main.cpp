@@ -9,9 +9,14 @@
 #include "embed/roboto.font"
 
 #include "gpu/device.hpp"
+#include "gpu/common.hpp"
 #include "gpu/surface.hpp"
+
 #include "log.hpp"
 #include <vulkan/vulkan.h>
+
+#include "embed/color.vert"
+#include "embed/color.frag"
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
@@ -85,6 +90,80 @@ int main(int, char**) {
   bool show_demo_window    = true;
   bool show_another_window = false;
   ImVec4 clear_color       = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+  VkShaderModuleCreateInfo vertex_shader_create_info = {};
+  vertex_shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  vertex_shader_create_info.pNext = nullptr;
+  vertex_shader_create_info.codeSize = sizeof(_shader_vert_spv);
+  vertex_shader_create_info.pCode = _shader_vert_spv;
+
+  VkShaderModule vertex_shader_module = {0};
+  VK_CHECK(vkCreateShaderModule(device.logical, &vertex_shader_create_info, device.allocator, &vertex_shader_module));
+  defer { vkDestroyShaderModule(device.logical, vertex_shader_module, device.allocator); };
+
+  VkShaderModuleCreateInfo fragment_shader_create_info = {};
+  fragment_shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  fragment_shader_create_info.pNext = nullptr;
+  fragment_shader_create_info.codeSize = sizeof(_shader_frag_spv);
+  fragment_shader_create_info.pCode = _shader_frag_spv;
+
+  VkShaderModule fragment_shader_module = {0};
+  VK_CHECK(vkCreateShaderModule(device.logical, &fragment_shader_create_info, device.allocator, &fragment_shader_module));
+  defer { vkDestroyShaderModule(device.logical, fragment_shader_module, device.allocator); };
+
+  VkAttachmentDescription attachment = {};
+  attachment.format = surface.format.format;
+  attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // clear every frame.
+  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+  VkAttachmentReference color_attachment = {};
+  color_attachment.attachment = 0;
+  color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkSubpassDescription subpass = {};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &color_attachment;
+
+  VkSubpassDependency dependency = {};
+  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependency.dstSubpass = 0;
+  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.srcAccessMask = 0;
+  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+  VkRenderPassCreateInfo render_pass_create_info = {};
+  render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  render_pass_create_info.attachmentCount = 1;
+  render_pass_create_info.pAttachments = &attachment;
+  render_pass_create_info.subpassCount = 1;
+  render_pass_create_info.pSubpasses = &subpass;
+  render_pass_create_info.dependencyCount = 1;
+  render_pass_create_info.pDependencies = &dependency;
+
+  VkRenderPass render_pass;
+  VK_CHECK(vkCreateRenderPass(device.logical, &render_pass_create_info, device.allocator, &render_pass));
+  defer { vkDestroyRenderPass(device.logical, render_pass, device.allocator); };
+
+  // VkPipeline pipeline;
+
+  // 
+  struct Frame_Data {
+    VkCommandPool command_pool;
+    VkFence fence;
+    VkCommandBuffer command_buffer;
+    VkFramebuffer framebuffer;
+  };
+
+  // initialize_frame_data
+  const auto num_images = surface.num_images; // used to test if something changed.
+  auto frame_data = frame_allocator.push_array_no_init<Frame_Data>(surface.num_images);
 
   while (!glfwWindowShouldClose(window)) {
     // Poll and handle events (inputs, window resize, etc.)

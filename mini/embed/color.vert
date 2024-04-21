@@ -17,7 +17,7 @@ void main()
     gl_Position = vec4(aPos * pc.uScale + pc.uTranslate, 0, 1);
 }
 */
-constexpr uint32_t __glsl_shader_vert_spv[] =
+constexpr uint32_t _shader_vert_spv[] =
 {
     0x07230203,0x00010000,0x00080001,0x0000002e,0x00000000,0x00020011,0x00000001,0x0006000b,
     0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
