@@ -13,6 +13,12 @@ struct Surface {
   VkSurfaceKHR surface     = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
+  u32 frame_idx  = 0;
+
+  // this should be enough
+  s32 width  = -1;
+  s32 height = -1;
+
   VkSurfaceFormatKHR format = {};
 
   // FRAME STUFF
@@ -20,13 +26,6 @@ struct Surface {
   VkImageView image_views[MAX_IMAGES];
   VkSemaphore image_avail[MAX_IMAGES];
   VkSemaphore render_done[MAX_IMAGES];
-  Delay_Queue deletion_queue[MAX_IMAGES];
-
-  u32 frame_idx  = 0;
-
-  // this should be enough
-  s16 width  = -1;
-  s16 height = -1;
 
   s8 num_images = 0;
 };

@@ -5,18 +5,21 @@
 
 #include "core/memory.hpp"
 #include "defs.hpp"
+#include "vma/vk_mem_alloc.h"
+
 
 // forward declare
 struct GLFWwindow;
 
 struct Device {
-  VkInstance instance              = VK_NULL_HANDLE; // for convenience
-  VkAllocationCallbacks* allocator = nullptr;        // for convenience
+  VkInstance instance                        = VK_NULL_HANDLE; // for convenience
+  VkAllocationCallbacks* allocator_callbacks = nullptr;        // for convenience
 
   VkDevice logical          = VK_NULL_HANDLE;
   VkPhysicalDevice physical = VK_NULL_HANDLE;
   VkQueue queue             = VK_NULL_HANDLE;
-  u32 queue_family          = (u32)-1;
+  VmaAllocator allocator;
+  u32 queue_family = (u32)-1;
 };
 
 VkInstance init_gpu_instance(Temp_Linear_Allocator arena);

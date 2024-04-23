@@ -19,12 +19,13 @@ struct Delay_Info {
   void* resource_ptr = nullptr;
   VkInstance instance = VK_NULL_HANDLE;
   VkDevice device = VK_NULL_HANDLE;
-  const VkAllocationCallbacks* allocator = nullptr;
+  VmaAllocator allocator = VK_NULL_HANDLE;
+  const VkAllocationCallbacks* allocator_callbacks = nullptr;
   // probably shouldn't be accessed by the user?
   Delay_Info* next; 
   Delay_Info* prev; 
   GPU_Resource_Type resource_type;
-  u32 pad[3];
+  u32 pad;
 };
 
 Allocator default_delay_queue_allocator();

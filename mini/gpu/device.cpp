@@ -99,11 +99,11 @@ static VkBool32
 }
 
 // we probably need to wrap this somewhere
-static VkInstance instance                      = VK_NULL_HANDLE;
-static VkAllocationCallbacks* allocator         = nullptr; // can point to something meaningful.
-static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
-static VkDebugReportCallbackEXT debug_report    = VK_NULL_HANDLE;
-static bool vk_debug_layers_present             = false;
+static VkInstance instance                        = VK_NULL_HANDLE;
+static VkAllocationCallbacks* allocator_callbacks = nullptr; // can point to something meaningful.
+static VkDebugUtilsMessengerEXT debug_messenger   = VK_NULL_HANDLE;
+static VkDebugReportCallbackEXT debug_report      = VK_NULL_HANDLE;
+static bool vk_debug_layers_present               = false;
 
 VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
   VkApplicationInfo app_info  = {};
@@ -179,7 +179,7 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
   // Create Vulkan Instance
   create_info.enabledExtensionCount   = instance_extensions_count;
   create_info.ppEnabledExtensionNames = instance_extensions;
-  VK_CHECK(vkCreateInstance(&create_info, allocator, &instance));
+  VK_CHECK(vkCreateInstance(&create_info, allocator_callbacks, &instance));
 
 #if VK_DEBUG // need to check if there even contains the debug layers
   if (vk_debug_layers_present) {
@@ -196,7 +196,8 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
     auto vkCreateDebugUtilsMessengerEXT =
         (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     assert(vkCreateDebugUtilsMessengerEXT);
-    VK_CHECK(vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, allocator, &debug_messenger));
+    VK_CHECK(
+        vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, allocator_callbacks, &debug_messenger));
 
     // Setup the debug report callback
     auto vkCreateDebugReportCallbackEXT =
@@ -209,7 +210,7 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
         VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
     debug_report_ci.pfnCallback = vk_debug_report;
     debug_report_ci.pUserData   = nullptr;
-    VK_CHECK(vkCreateDebugReportCallbackEXT(instance, &debug_report_ci, allocator, &debug_report));
+    VK_CHECK(vkCreateDebugReportCallbackEXT(instance, &debug_report_ci, allocator_callbacks, &debug_report));
   } else {
     log_error("Debug layers not present for vulkan even though DEBUG is true!");
   }
@@ -226,22 +227,22 @@ void cleanup_gpu_instance() {
   auto vkDestroyDebugUtilsMessengerEXT =
       (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
   assert(vkDestroyDebugUtilsMessengerEXT);
-  vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, allocator);
+  vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, allocator_callbacks);
 
   auto vkDestroyDebugReportCallbackEXT =
       (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
   assert(vkDestroyDebugReportCallbackEXT);
-  vkDestroyDebugReportCallbackEXT(instance, debug_report, allocator);
+  vkDestroyDebugReportCallbackEXT(instance, debug_report, allocator_callbacks);
 #endif
-  vkDestroyInstance(instance, allocator);
+  vkDestroyInstance(instance, allocator_callbacks);
   // volkFinalize();
 }
 
 Device create_device(Temp_Linear_Allocator arena) {
   /// TODO: add maybe properties to check? For rendering, for compute...
-  Device device    = {};
-  device.instance  = instance;
-  device.allocator = allocator;
+  Device device              = {};
+  device.instance            = instance;
+  device.allocator_callbacks = allocator_callbacks;
 
   VkDevice& logical_device          = device.logical;
   VkPhysicalDevice& physical_device = device.physical;
@@ -260,6 +261,7 @@ Device create_device(Temp_Linear_Allocator arena) {
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
     /// @TODO: revisit this.
+    defer {scratch.clear();};
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(gpus[i], &properties);
     if (properties.apiVersion < required_version) continue;
@@ -340,11 +342,7 @@ Device create_device(Temp_Linear_Allocator arena) {
       queue_family    = probable_queue_fam;
       break;
     }
-
-    scratch.clear();
   }
-
-  scratch.clear();
 
   // nothing was selected
   if (physical_device == VK_NULL_HANDLE) {
@@ -410,15 +408,26 @@ Device create_device(Temp_Linear_Allocator arena) {
 
   create_info.pNext = &features13;
 
-  VK_CHECK(vkCreateDevice(physical_device, &create_info, allocator, &logical_device));
+  VK_CHECK(vkCreateDevice(physical_device, &create_info, allocator_callbacks, &logical_device));
   vkGetDeviceQueue(logical_device, queue_family, 0, &queue);
   arena.clear();
+
+  // initialize the memory allocator
+  VmaAllocatorCreateInfo allocator_create_info = {};
+  allocator_create_info.physicalDevice         = device.physical;
+  allocator_create_info.device                 = device.logical;
+  allocator_create_info.instance               = instance;
+  allocator_create_info.flags                  = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+  VK_CHECK(vmaCreateAllocator(&allocator_create_info, &device.allocator));
 
   // volkLoadDevice(device);
   return device;
 }
 
-void destroy_device(Device device) { vkDestroyDevice(device.logical, allocator); }
+void destroy_device(Device device) {
+  vmaDestroyAllocator(device.allocator);
+  vkDestroyDevice(device.logical, allocator_callbacks);
+}
 
 VkSurfaceKHR platform_create_vk_surface(GLFWwindow* window) {
   VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -429,8 +438,8 @@ VkSurfaceKHR platform_create_vk_surface(GLFWwindow* window) {
   // create_info.hinstance = NULL;
   // create_info.hwnd = glfwGetWin32Window(window);
   // vk_check(vkCreateWin32SurfaceKHR(instance, &create_info, allocator_callback, &surface));
-  VK_CHECK(glfwCreateWindowSurface(instance, window, allocator, &surface));
+  VK_CHECK(glfwCreateWindowSurface(instance, window, allocator_callbacks, &surface));
   return surface;
 }
 
-void platform_destroy_vk_surface(VkSurfaceKHR surface) { vkDestroySurfaceKHR(instance, surface, allocator); }
+void platform_destroy_vk_surface(VkSurfaceKHR surface) { vkDestroySurfaceKHR(instance, surface, allocator_callbacks); }

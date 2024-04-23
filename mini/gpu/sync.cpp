@@ -5,7 +5,7 @@ constexpr auto gpu_delay_info_stack_size = 1000;
 static Delay_Info gpu_delay_info_stack[gpu_delay_info_stack_size];
 static size_t gpu_delay_info_stack_ptr = 0;
 
-void default_delay_queue_allocator_proc(Allocation_Parameters* params, Allocation_Result* result) {
+static void default_delay_queue_allocator_proc(Allocation_Parameters* params, Allocation_Result* result) {
   assert(result);
   assert(params);
   assert(params->size == sizeof(Delay_Info));
@@ -33,17 +33,20 @@ Allocator default_delay_queue_allocator() {
   return allocator;
 }
 
+// clang-format off
 static void delay_queue_proc(Delay_Info* info) {
   switch (info->resource_type) {
     case GPU_Resource_Type::Image_View:
-      vkDestroyImageView(info->device, (VkImageView)info->resource_ptr, info->allocator);
+      vkDestroyImageView(info->device, (VkImageView)info->resource_ptr, info->allocator_callbacks);
       break;
     case GPU_Resource_Type::Semaphore:
-      vkDestroySemaphore(info->device, (VkSemaphore)info->resource_ptr, info->allocator);
+      vkDestroySemaphore(info->device, (VkSemaphore)info->resource_ptr, info->allocator_callbacks);
       break;
-    case GPU_Resource_Type::Fence: vkDestroyFence(info->device, (VkFence)info->resource_ptr, info->allocator); break;
+    case GPU_Resource_Type::Fence: 
+      vkDestroyFence(info->device, (VkFence)info->resource_ptr, info->allocator_callbacks); 
+      break;
     case GPU_Resource_Type::Swapchain:
-      vkDestroySwapchainKHR(info->device, (VkSwapchainKHR)info->resource_ptr, info->allocator);
+      vkDestroySwapchainKHR(info->device, (VkSwapchainKHR)info->resource_ptr, info->allocator_callbacks);
       break;
     default:
       // not implemented yet.
@@ -51,6 +54,7 @@ static void delay_queue_proc(Delay_Info* info) {
       break;
   }
 }
+// clang-format on
 
 void Delay_Queue::flush() {
   auto node = head;
@@ -87,33 +91,33 @@ Delay_Info* Delay_Queue::push_generic() {
 }
 
 void Delay_Queue::push(VkDevice device, VkImageView image_view, const VkAllocationCallbacks* allocator_callbacks) {
-  auto node           = push_generic();
-  node->resource_type = GPU_Resource_Type::Image_View;
-  node->resource_ptr  = image_view;
-  node->device        = device;
-  node->allocator     = allocator_callbacks;
+  auto node                 = push_generic();
+  node->resource_type       = GPU_Resource_Type::Image_View;
+  node->resource_ptr        = image_view;
+  node->device              = device;
+  node->allocator_callbacks = allocator_callbacks;
 }
 
 void Delay_Queue::push(VkDevice device, VkSemaphore semaphore, const VkAllocationCallbacks* allocator_callbacks) {
-  auto node           = push_generic();
-  node->resource_type = GPU_Resource_Type::Semaphore;
-  node->resource_ptr  = semaphore;
-  node->device        = device;
-  node->allocator     = allocator_callbacks;
+  auto node                 = push_generic();
+  node->resource_type       = GPU_Resource_Type::Semaphore;
+  node->resource_ptr        = semaphore;
+  node->device              = device;
+  node->allocator_callbacks = allocator_callbacks;
 }
 
 void Delay_Queue::push(VkDevice device, VkFence fence, const VkAllocationCallbacks* allocator_callbacks) {
-  auto node           = push_generic();
-  node->resource_type = GPU_Resource_Type::Fence;
-  node->resource_ptr  = fence;
-  node->device        = device;
-  node->allocator     = allocator_callbacks;
+  auto node                 = push_generic();
+  node->resource_type       = GPU_Resource_Type::Fence;
+  node->resource_ptr        = fence;
+  node->device              = device;
+  node->allocator_callbacks = allocator_callbacks;
 }
 
 void Delay_Queue::push(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* allocator_callbacks) {
-  auto node           = push_generic();
-  node->resource_type = GPU_Resource_Type::Swapchain;
-  node->resource_ptr  = swapchain;
-  node->device        = device;
-  node->allocator     = allocator_callbacks;
+  auto node                 = push_generic();
+  node->resource_type       = GPU_Resource_Type::Swapchain;
+  node->resource_ptr        = swapchain;
+  node->device              = device;
+  node->allocator_callbacks = allocator_callbacks;
 }

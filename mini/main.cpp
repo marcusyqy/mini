@@ -23,6 +23,44 @@ static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
 }
 
+static void copy_image_to_image(VkCommandBuffer cmd, VkImage src_image, VkImage destination, VkExtent2D src_size, VkExtent2D dst_size)
+{
+	VkImageBlit2 blit_region = {}; 
+  blit_region.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2; 
+  blit_region.pNext = nullptr;
+
+	blit_region.srcOffsets[1].x = src_size.width;
+	blit_region.srcOffsets[1].y = src_size.height;
+	blit_region.srcOffsets[1].z = 1;
+
+	blit_region.dstOffsets[1].x = dst_size.width;
+	blit_region.dstOffsets[1].y = dst_size.height;
+	blit_region.dstOffsets[1].z = 1;
+
+	blit_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blit_region.srcSubresource.baseArrayLayer = 0;
+	blit_region.srcSubresource.layerCount = 1;
+	blit_region.srcSubresource.mipLevel = 0;
+
+	blit_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blit_region.dstSubresource.baseArrayLayer = 0;
+	blit_region.dstSubresource.layerCount = 1;
+	blit_region.dstSubresource.mipLevel = 0;
+
+	VkBlitImageInfo2 blit_info = {}; 
+  blit_info.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2; 
+  blit_info.pNext = nullptr;
+	blit_info.dstImage = destination;
+	blit_info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	blit_info.srcImage = src_image;
+	blit_info.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	blit_info.filter = VK_FILTER_LINEAR;
+	blit_info.regionCount = 1;
+	blit_info.pRegions = &blit_region;
+
+	vkCmdBlitImage2(cmd, &blit_info);
+}
+
 static void transition_image(VkCommandBuffer command_buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout) {
   VkImageMemoryBarrier2 image_barrier = {};
   image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -131,8 +169,8 @@ int main(int, char**) {
   vertex_shader_create_info.pCode                    = _shader_vert_spv;
 
   VkShaderModule vertex_shader_module = { 0 };
-  VK_CHECK(vkCreateShaderModule(device.logical, &vertex_shader_create_info, device.allocator, &vertex_shader_module));
-  defer { vkDestroyShaderModule(device.logical, vertex_shader_module, device.allocator); };
+  VK_CHECK(vkCreateShaderModule(device.logical, &vertex_shader_create_info, device.allocator_callbacks, &vertex_shader_module));
+  defer { vkDestroyShaderModule(device.logical, vertex_shader_module, device.allocator_callbacks); };
 
   VkShaderModuleCreateInfo fragment_shader_create_info = {};
   fragment_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -142,8 +180,8 @@ int main(int, char**) {
 
   VkShaderModule fragment_shader_module = { 0 };
   VK_CHECK(
-      vkCreateShaderModule(device.logical, &fragment_shader_create_info, device.allocator, &fragment_shader_module));
-  defer { vkDestroyShaderModule(device.logical, fragment_shader_module, device.allocator); };
+      vkCreateShaderModule(device.logical, &fragment_shader_create_info, device.allocator_callbacks, &fragment_shader_module));
+  defer { vkDestroyShaderModule(device.logical, fragment_shader_module, device.allocator_callbacks); };
 
   VkAttachmentDescription attachment = {};
   attachment.format                  = surface.format.format;
@@ -182,30 +220,58 @@ int main(int, char**) {
   render_pass_create_info.pDependencies          = &dependency;
 
   VkRenderPass render_pass;
-  VK_CHECK(vkCreateRenderPass(device.logical, &render_pass_create_info, device.allocator, &render_pass));
-  defer { vkDestroyRenderPass(device.logical, render_pass, device.allocator); };
+  VK_CHECK(vkCreateRenderPass(device.logical, &render_pass_create_info, device.allocator_callbacks, &render_pass));
+  defer { vkDestroyRenderPass(device.logical, render_pass, device.allocator_callbacks); };
 
   // VkPipeline pipeline;
 
-  //
+  
   struct Frame_Data {
     VkCommandPool command_pool;
     VkFence fence;
     VkCommandBuffer command_buffer;
     VkFramebuffer framebuffer;
+    Image render_target;
+    Delay_Queue deletion_queue;
   };
 
   u64 acc = 0;
+
   // initialize_frame_data
   const auto num_images = surface.num_images; // used to test if something changed.
   auto frame_data       = frame_allocator.push_array_no_init<Frame_Data>(surface.num_images);
+
+  VkFormat rt_format = VK_FORMAT_R16G16B16A16_SFLOAT;  
+  VkExtent3D rt_extent = {(u32)surface.width, (u32)surface.height, 1};
+  VkImageUsageFlags rt_usage_flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+  VkImageCreateInfo rt_create_info = {};
+  rt_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  rt_create_info.pNext = nullptr;
+  rt_create_info.imageType = VK_IMAGE_TYPE_2D;
+  rt_create_info.format = rt_format;
+  rt_create_info.extent = rt_extent;
+  rt_create_info.mipLevels = 1;
+  rt_create_info.arrayLayers       = 1;
+  // for MSAA. we will not be using it by default, so default it to 1 sample per pixel.
+  rt_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  // optimal tiling, which means the image is stored on the best gpu format
+  rt_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  rt_create_info.usage  = rt_usage_flags;
+
+  VmaAllocationCreateInfo rt_alloc_info = {};
+	rt_alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	rt_alloc_info.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+  VmaAllocationInfo alloc_info = {};
+
 
   for(auto i = 0; i < num_images; ++i) {
     VkCommandPoolCreateInfo command_pool_create_info = {};
     command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     command_pool_create_info.flags = 0;
     command_pool_create_info.queueFamilyIndex = device.queue_family;
-    VK_CHECK(vkCreateCommandPool(device.logical, &command_pool_create_info, device.allocator, &frame_data[i].command_pool));
+    VK_CHECK(vkCreateCommandPool(device.logical, &command_pool_create_info, device.allocator_callbacks, &frame_data[i].command_pool));
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
     command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -217,13 +283,33 @@ int main(int, char**) {
     VkFenceCreateInfo fence_create_info = {};
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    VK_CHECK(vkCreateFence(device.logical, &fence_create_info, device.allocator, &frame_data[i].fence));
+    VK_CHECK(vkCreateFence(device.logical, &fence_create_info, device.allocator_callbacks, &frame_data[i].fence));
+    VK_CHECK(vmaCreateImage(device.allocator, &rt_create_info, &rt_alloc_info, &frame_data[i].render_target.image, &frame_data[i].render_target.allocation, &alloc_info));
+    // print alloc_info out here.
+
+    VkImageViewCreateInfo rt_view_create_info = {};
+    rt_view_create_info .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    rt_view_create_info.pNext = nullptr;
+
+    rt_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    rt_view_create_info.image = frame_data[i].render_target.image;
+    rt_view_create_info.format = rt_format;
+    rt_view_create_info.subresourceRange.baseMipLevel = 0;
+    rt_view_create_info.subresourceRange.levelCount = 1;
+    rt_view_create_info.subresourceRange.baseArrayLayer = 0;
+    rt_view_create_info.subresourceRange.layerCount = 1;
+    rt_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    VK_CHECK(vkCreateImageView(device.logical, &rt_view_create_info, device.allocator_callbacks, &frame_data[i].render_target.view));
+    frame_data[i].render_target.extent = rt_extent;
+    frame_data[i].render_target.format = rt_format;
   }
 
   defer {
     for(auto i = 0; i < num_images; ++i) {
-      vkDestroyCommandPool(device.logical, frame_data[i].command_pool,device.allocator);
-      vkDestroyFence(device.logical, frame_data[i].fence, device.allocator);
+      vkDestroyCommandPool(device.logical, frame_data[i].command_pool,device.allocator_callbacks);
+      vkDestroyImageView(device.logical, frame_data[i].render_target.view, device.allocator_callbacks);
+      vmaDestroyImage(device.allocator, frame_data[i].render_target.image, frame_data[i].render_target.allocation);
+      vkDestroyFence(device.logical, frame_data[i].fence, device.allocator_callbacks);
     }
   };
 
@@ -250,7 +336,8 @@ int main(int, char**) {
 
     VK_CHECK(vkBeginCommandBuffer(current_frame.command_buffer, &command_buffer_begin_info));
 
-    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    transition_image(current_frame.command_buffer, current_frame.render_target.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
 
     //make a clear-color from frame number. This will flash with a 120 frame period.
     VkClearColorValue clear_value = { { 0.0f, 0.0f, (float)fabs(sin(acc / 120.f)), 1.0f } };
@@ -263,9 +350,16 @@ int main(int, char**) {
     clear_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     //clear image
-    vkCmdClearColorImage(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_range);
+    vkCmdClearColorImage(current_frame.command_buffer, current_frame.render_target.image, VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_range);
 
-    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    transition_image(current_frame.command_buffer, current_frame.render_target.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkExtent2D render_extent = {current_frame.render_target.extent.width, current_frame.render_target.extent.height};
+
+    VkExtent2D surface_extent = { (u32)surface.width, (u32)surface.height};
+    copy_image_to_image(current_frame.command_buffer, current_frame.render_target.image, surface.images[surface.frame_idx], render_extent, surface_extent);
+
+    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(current_frame.command_buffer));
 
