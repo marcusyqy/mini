@@ -8,6 +8,7 @@
 #include "gpu/common.cpp"
 #include "gpu/device.cpp"
 #include "gpu/surface.cpp"
+#include "gpu/sync.cpp"
 
 // other files
 #include "draw.cpp"

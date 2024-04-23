@@ -23,7 +23,6 @@ static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
 }
 
-
 static void transition_image(VkCommandBuffer command_buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout) {
   VkImageMemoryBarrier2 image_barrier = {};
   image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

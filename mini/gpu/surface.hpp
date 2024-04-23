@@ -2,6 +2,7 @@
 #include "core/memory.hpp"
 #include "defs.hpp"
 #include <vulkan/vulkan.h>
+#include "sync.hpp"
 
 struct GLFWwindow;
 struct Device;
@@ -19,6 +20,7 @@ struct Surface {
   VkImageView image_views[MAX_IMAGES];
   VkSemaphore image_avail[MAX_IMAGES];
   VkSemaphore render_done[MAX_IMAGES];
+  Delay_Queue deletion_queue[MAX_IMAGES];
 
   u32 frame_idx  = 0;
 

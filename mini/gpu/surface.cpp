@@ -133,7 +133,7 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
   create_info.presentMode           = chosen_present_mode;
   create_info.clipped               = VK_TRUE;
   create_info.oldSwapchain          = surface->swapchain;
-  VK_CHECK(vkCreateSwapchainKHR(device->logical, &create_info, nullptr, &surface->swapchain));
+  VK_CHECK(vkCreateSwapchainKHR(device->logical, &create_info, device->allocator, &surface->swapchain));
   arena.clear();
 
   // @TODO: erase all resources without waiting for gpu to be idle
@@ -142,11 +142,11 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
   // cleanup : required to safely destroy after creating new swapchain.
   if (create_info.oldSwapchain != nullptr) {
     for (u8 i = 0; i < old_num_images; ++i) {
-      vkDestroyImageView(device->logical, surface->image_views[i], nullptr);
-      vkDestroySemaphore(device->logical, surface->render_done[i], nullptr);
-      vkDestroySemaphore(device->logical, surface->image_avail[i], nullptr);
+      vkDestroyImageView(device->logical, surface->image_views[i], device->allocator);
+      vkDestroySemaphore(device->logical, surface->render_done[i], device->allocator);
+      vkDestroySemaphore(device->logical, surface->image_avail[i], device->allocator);
     }
-    vkDestroySwapchainKHR(device->logical, create_info.oldSwapchain, nullptr);
+    vkDestroySwapchainKHR(device->logical, create_info.oldSwapchain, device->allocator);
   }
 
   u32 num_images = surface->num_images;
@@ -181,14 +181,14 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
     image_view_create_info.subresourceRange.layerCount     = 1;
 
     // create image view
-    VK_CHECK(vkCreateImageView(device->logical, &image_view_create_info, nullptr, surface->image_views + i));
+    VK_CHECK(vkCreateImageView(device->logical, &image_view_create_info, device->allocator, surface->image_views + i));
 
     // create semaphore
     VkSemaphoreCreateInfo semaphore_info{};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VK_CHECK(vkCreateSemaphore(device->logical, &semaphore_info, nullptr, surface->image_avail + i));
-    VK_CHECK(vkCreateSemaphore(device->logical, &semaphore_info, nullptr, surface->render_done + i));
+    VK_CHECK(vkCreateSemaphore(device->logical, &semaphore_info, device->allocator, surface->image_avail + i));
+    VK_CHECK(vkCreateSemaphore(device->logical, &semaphore_info, device->allocator, surface->render_done + i));
   }
 
   // swapchain_acquire_next_image(swapchain);
@@ -215,11 +215,11 @@ void destroy_surface(Device& device, Surface& surface) {
   vkDeviceWaitIdle(device.logical);
   // destroy swapchain resources
   for (u8 i = 0; i < surface.num_images; ++i) {
-    vkDestroyImageView(device.logical, surface.image_views[i], nullptr);
-    vkDestroySemaphore(device.logical, surface.image_avail[i], nullptr);
-    vkDestroySemaphore(device.logical, surface.render_done[i], nullptr);
+    vkDestroyImageView(device.logical, surface.image_views[i], device.allocator);
+    vkDestroySemaphore(device.logical, surface.image_avail[i], device.allocator);
+    vkDestroySemaphore(device.logical, surface.render_done[i], device.allocator);
   }
-  vkDestroySwapchainKHR(device.logical, surface.swapchain, nullptr);
+  vkDestroySwapchainKHR(device.logical, surface.swapchain, device.allocator);
 
   UNUSED_VAR(device);
   platform_destroy_vk_surface(surface.surface);

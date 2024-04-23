@@ -72,7 +72,7 @@ enum struct Allocation_Err {
 };
 
 struct Allocation_Parameters {
-  Allocation_Op alloc_instruction;
+  Allocation_Op op;
   void* user_ptr;
   void* memory;
   u64 size;
