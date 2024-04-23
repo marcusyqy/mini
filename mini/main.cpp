@@ -2,6 +2,7 @@
 #include "imgui_impl_glfw.h"
 
 #include "defs.hpp"
+#include "math.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -20,6 +21,39 @@
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
+}
+
+
+static void transition_image(VkCommandBuffer command_buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout) {
+  VkImageMemoryBarrier2 image_barrier = {};
+  image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+  image_barrier.pNext = nullptr;
+
+  image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+  image_barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+  image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+  image_barrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
+
+  image_barrier.oldLayout = old_layout;
+  image_barrier.newLayout = new_layout;
+
+  VkImageAspectFlags aspectMask = (image_barrier.newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+  VkImageSubresourceRange sub_image = {};
+  sub_image.aspectMask = aspectMask;
+  sub_image.baseMipLevel = 0;
+  sub_image.levelCount = VK_REMAINING_MIP_LEVELS;
+  sub_image.baseArrayLayer = 0;
+  sub_image.layerCount = VK_REMAINING_ARRAY_LAYERS;
+  image_barrier.subresourceRange = sub_image; 
+  image_barrier.image = image;
+
+  VkDependencyInfo dependency_info = {};
+  dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+  dependency_info.pNext = nullptr;
+
+  dependency_info.imageMemoryBarrierCount = 1;
+  dependency_info.pImageMemoryBarriers = &image_barrier;
+  vkCmdPipelineBarrier2(command_buffer, &dependency_info);
 }
 
 int main(int, char**) {
@@ -162,27 +196,132 @@ int main(int, char**) {
     VkFramebuffer framebuffer;
   };
 
+  u64 acc = 0;
   // initialize_frame_data
   const auto num_images = surface.num_images; // used to test if something changed.
   auto frame_data       = frame_allocator.push_array_no_init<Frame_Data>(surface.num_images);
 
+  for(auto i = 0; i < num_images; ++i) {
+    VkCommandPoolCreateInfo command_pool_create_info = {};
+    command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    command_pool_create_info.flags = 0;
+    command_pool_create_info.queueFamilyIndex = device.queue_family;
+    VK_CHECK(vkCreateCommandPool(device.logical, &command_pool_create_info, device.allocator, &frame_data[i].command_pool));
+
+    VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
+    command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    command_buffer_allocate_info.commandPool = frame_data[i].command_pool;
+    command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    command_buffer_allocate_info.commandBufferCount = 1;
+    VK_CHECK(vkAllocateCommandBuffers(device.logical, &command_buffer_allocate_info, &frame_data[i].command_buffer));
+
+    VkFenceCreateInfo fence_create_info = {};
+    fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    VK_CHECK(vkCreateFence(device.logical, &fence_create_info, device.allocator, &frame_data[i].fence));
+  }
+
+  defer {
+    for(auto i = 0; i < num_images; ++i) {
+      vkDestroyCommandPool(device.logical, frame_data[i].command_pool,device.allocator);
+      vkDestroyFence(device.logical, frame_data[i].fence, device.allocator);
+    }
+  };
+
+  u8 sync_idx = 0;
   while (!glfwWindowShouldClose(window)) {
-    // Poll and handle events (inputs, window resize, etc.)
-    // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your
-    // inputs.
-    // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite
-    // your copy of the mouse data.
-    // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or
-    // clear/overwrite your copy of the keyboard data. Generally you may always pass all inputs to dear imgui, and hide
-    // them from your application based on those two flags.
     glfwPollEvents();
 
-// draw::new_frame(vk_win);
+    auto& current_frame = frame_data[surface.frame_idx];
+    VK_CHECK(vkWaitForFences(device.logical, 1, &current_frame.fence, true, UINT64_MAX));
+    VK_CHECK(vkResetFences(device.logical, 1, &current_frame.fence));
 
-// main program handled here(?)
+    VkResult result = vkAcquireNextImageKHR(device.logical, surface.swapchain, UINT64_MAX, surface.image_avail[sync_idx], nullptr, &surface.frame_idx);
+    if(result != VK_SUCCESS) {
+      // may need to resize here.
+      continue;
+    }
 
-// Start the Dear ImGui frame
+    vkResetCommandPool(device.logical, current_frame.command_pool, 0);
+
+    VkCommandBufferBeginInfo command_buffer_begin_info = {};
+    command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    command_buffer_begin_info.flags = 0;
+    command_buffer_begin_info.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(current_frame.command_buffer, &command_buffer_begin_info));
+
+    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    //make a clear-color from frame number. This will flash with a 120 frame period.
+    VkClearColorValue clear_value = { { 0.0f, 0.0f, (float)fabs(sin(acc / 120.f)), 1.0f } };
+
+    VkImageSubresourceRange clear_range =  {};
+    clear_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    clear_range.baseMipLevel = 0;
+    clear_range.levelCount = VK_REMAINING_MIP_LEVELS;
+    clear_range.baseArrayLayer = 0;
+    clear_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    //clear image
+    vkCmdClearColorImage(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_range);
+
+    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+    VK_CHECK(vkEndCommandBuffer(current_frame.command_buffer));
+
+    VkCommandBufferSubmitInfo command_buffer_submit_info = {};
+    command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    command_buffer_submit_info.commandBuffer = current_frame.command_buffer;
+    command_buffer_submit_info.deviceMask = 0;
+    command_buffer_submit_info.pNext = nullptr;
+
+    VkSemaphoreSubmitInfo wait_semaphore_submit_info = {};
+    wait_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    wait_semaphore_submit_info.semaphore = surface.image_avail[sync_idx];
+    wait_semaphore_submit_info.deviceIndex = 0;
+    wait_semaphore_submit_info.value = 1;
+    wait_semaphore_submit_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
+    
+    VkSemaphoreSubmitInfo signal_semaphore_submit_info = {};
+    signal_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    signal_semaphore_submit_info.semaphore = surface.render_done[sync_idx];
+    signal_semaphore_submit_info.deviceIndex = 0;
+    signal_semaphore_submit_info.value = 1;
+    signal_semaphore_submit_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+
+    VkSubmitInfo2 submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit_info.commandBufferInfoCount = 1;
+    submit_info.pCommandBufferInfos = &command_buffer_submit_info;
+    submit_info.pWaitSemaphoreInfos = &wait_semaphore_submit_info;
+    submit_info.waitSemaphoreInfoCount = 1;
+    submit_info.pSignalSemaphoreInfos = &signal_semaphore_submit_info;
+    submit_info.signalSemaphoreInfoCount = 1;
+    VK_CHECK(vkQueueSubmit2(device.queue, 1, &submit_info, current_frame.fence));
+
+    VkPresentInfoKHR present_info = {};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.pImageIndices = &surface.frame_idx;
+    present_info.pSwapchains = &surface.swapchain;
+    present_info.swapchainCount = 1;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = &surface.render_done[sync_idx];
+    VK_CHECK(vkQueuePresentKHR(device.queue, &present_info));
+
+    // acquire after present
+    // there's a chance that this will have to wait somehow.
+    sync_idx = (sync_idx + 1) % surface.num_images;
+    acc++;
+  }
+
+  vkDeviceWaitIdle(device.logical);
+  return 0;
+}
+
+
 #if 0
+// Start the Dear ImGui frame
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
@@ -240,10 +379,5 @@ int main(int, char**) {
       ImGui::UpdatePlatformWindows();
       ImGui::RenderPlatformWindowsDefault();
     }
-#endif
-
     // if (!main_is_minimized) draw::present_frame(vk_win);
-  }
-
-  return 0;
-}
+#endif

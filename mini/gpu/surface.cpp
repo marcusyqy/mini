@@ -122,7 +122,7 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
   create_info.imageColorSpace       = surface->format.colorSpace;
   create_info.imageExtent           = { (u32)surface->width, (u32)surface->height };
   create_info.imageArrayLayers      = 1;
-  create_info.imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  create_info.imageUsage            = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   create_info.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
   create_info.queueFamilyIndexCount = 0;
   create_info.pQueueFamilyIndices   = nullptr;
@@ -149,16 +149,14 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
     vkDestroySwapchainKHR(device->logical, create_info.oldSwapchain, nullptr);
   }
 
-  // retrieve images
-  VkImage placeholder[Surface::MAX_IMAGES];
   u32 num_images = surface->num_images;
   vkGetSwapchainImagesKHR(device->logical, surface->swapchain, &num_images, nullptr);
   assert(num_images <= Surface::MAX_IMAGES);
-  vkGetSwapchainImagesKHR(device->logical, surface->swapchain, &num_images, placeholder);
+  vkGetSwapchainImagesKHR(device->logical, surface->swapchain, &num_images, surface->images);
   surface->num_images = (u8)num_images;
 
   for (u8 i = 0; i < surface->num_images; ++i) {
-    const auto& image = placeholder[i];
+    const auto& image = surface->images[i];
 
     VkImageViewCreateInfo image_view_create_info{};
     image_view_create_info.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;

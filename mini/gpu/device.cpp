@@ -256,18 +256,6 @@ Device create_device(Temp_Linear_Allocator arena) {
 
   constexpr auto required_version = VK_API_VERSION_1_3;
 
-  // vulkan 1.3 features
-  VkPhysicalDeviceVulkan13Features features13{};
-  features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-  features13.dynamicRendering = true;
-  features13.synchronization2 = true;
-
-  // vulkan 1.2 features
-  VkPhysicalDeviceVulkan12Features features12{};
-  features12.sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  features12.bufferDeviceAddress = true;
-  features12.descriptorIndexing  = true;
-
   auto scratch = arena.save();
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
@@ -380,10 +368,11 @@ Device create_device(Temp_Linear_Allocator arena) {
   arena.clear();
 
   // create a device
-  const char** device_extentions               = arena.push_array_no_init<const char*>(2);
+  const char** device_extentions               = arena.push_array_no_init<const char*>(3);
   u32 device_extensions_count                  = 0;
   device_extentions[device_extensions_count++] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-  u32 extension_count                          = 0;
+
+  u32 extension_count = 0;
   vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, nullptr);
   assert(extension_count > 0);
   VkExtensionProperties* available_extensions = arena.push_array_no_init<VkExtensionProperties>(extension_count);
@@ -405,6 +394,21 @@ Device create_device(Temp_Linear_Allocator arena) {
   create_info.pQueueCreateInfos       = &queue_info;
   create_info.enabledExtensionCount   = device_extensions_count;
   create_info.ppEnabledExtensionNames = device_extentions;
+
+  VkPhysicalDeviceVulkan12Features features12{};
+  features12.sType               = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  features12.bufferDeviceAddress = VK_TRUE;
+  features12.descriptorIndexing  = VK_TRUE;
+  features12.pNext               = nullptr;
+
+  // vulkan 1.3 features
+  VkPhysicalDeviceVulkan13Features features13{};
+  features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  features13.dynamicRendering = true;
+  features13.synchronization2 = VK_TRUE;
+  features13.pNext            = &features12;
+
+  create_info.pNext = &features13;
 
   VK_CHECK(vkCreateDevice(physical_device, &create_info, allocator, &logical_device));
   vkGetDeviceQueue(logical_device, queue_family, 0, &queue);

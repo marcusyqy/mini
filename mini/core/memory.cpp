@@ -191,7 +191,7 @@ void Linear_Allocator::clear() {
 void Linear_Allocator::free() {
   while (head) {
     auto tmp = head->next;
-    allocator.free((void*)tmp);
+    allocator.free((void*)head);
     head = tmp;
   }
 }

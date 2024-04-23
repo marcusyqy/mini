@@ -15,16 +15,18 @@ struct Surface {
   VkSurfaceFormatKHR format = {};
 
   // FRAME STUFF
+  VkImage          images[MAX_IMAGES];
   VkImageView image_views[MAX_IMAGES];
   VkSemaphore image_avail[MAX_IMAGES];
   VkSemaphore render_done[MAX_IMAGES];
+
+  u32 frame_idx  = 0;
 
   // this should be enough
   s16 width  = -1;
   s16 height = -1;
 
   s8 num_images = 0;
-  s8 frame_idx  = 0;
 };
 
 Surface create_surface(Temp_Linear_Allocator arena, Device& device, GLFWwindow* window, s16 width, s16 height);
