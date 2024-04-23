@@ -57,39 +57,47 @@ public:
   }
 };
 
-enum struct Allocation_Instruction { alloc, resize, free, alloc_no_zero };
+enum struct Allocation_Op { 
+  alloc, 
+  resize, 
+  free, 
+  alloc_no_zero,
+  resize_no_zero 
+};
 
-enum struct Allocation_Info {
+enum struct Allocation_Err {
   none = 0,
-  relocated_memory, // for realloc
   out_of_bounds,    // for realloc & free
   out_of_memory,
 };
 
 struct Allocation_Parameters {
-  Allocation_Instruction alloc_instruction;
+  Allocation_Op alloc_instruction;
   void* user_ptr;
   void* memory;
   u64 size;
+  u64 old_size;
   u64 alignment;
 };
 
-struct Allocation_Return {
+struct Allocation_Result {
   void* memory;
-  Allocation_Info result;
+  Allocation_Err info = Allocation_Err::none;
 };
 
-Allocation_Return default_allocator_proc(Allocation_Parameters params);
+void default_allocator_proc(Allocation_Parameters* params, Allocation_Result* result);
 
 struct Allocator {
-  using Allocator_Proc      = Allocation_Return (*)(Allocation_Parameters params);
+  using Allocator_Proc      = void (*)(Allocation_Parameters* params, Allocation_Result* result);
   Allocator_Proc alloc_proc = default_allocator_proc;
   void* user_ptr            = nullptr;
 
-  Allocation_Return allocate(u64 size, u64 alignment);
-  Allocation_Return allocate_no_zero(u32 size, u32 alignment);
-  Allocation_Info free(void* memory);
-  Allocation_Return realloc(void* memory, u32 size, u32 alignment);
+  Allocation_Result allocate(u64 size, u64 alignment);
+  Allocation_Result allocate_no_zero(u64 size, u64 alignment);
+  Allocation_Result realloc(void* memory, u64 size, u64 alignment, u64 old_size);
+  Allocation_Result realloc_no_zero(void* memory, u64 size, u64 alignment, u64 old_size);
+
+  Allocation_Err free(void* memory);
 };
 
 struct Linear_Allocator_Strategy {
@@ -99,8 +107,8 @@ struct Linear_Allocator_Strategy {
   u64 prev_offset;
 
   void init(u8* _buf, u64 _size);
-  Allocation_Return alloc(u64 size, u64 alignment);
-  Allocation_Return realloc(void* previous, u64 prev_size, u64 size, u64 alignment);
+  Allocation_Result alloc(u64 size, u64 alignment);
+  Allocation_Result realloc(void* previous, u64 prev_size, u64 size, u64 alignment);
   void clear();
 };
 
