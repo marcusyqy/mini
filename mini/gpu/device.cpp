@@ -18,7 +18,7 @@
 #if defined(_WIN32) || defined(WIN32)
 #define GPU_PLATFORM_SURFACE "VK_KHR_win32_surface"
 #else
-static_assert(false, "Other platforms not supported currently.");
+#error "Other platforms not supported currently"
 #endif
 
 static constexpr auto VK_API_VERSION                  = VK_API_VERSION_1_3;
