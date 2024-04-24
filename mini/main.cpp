@@ -1,5 +1,6 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 #include "defs.hpp"
 #include "math.h"
@@ -24,20 +25,61 @@ static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
 }
 
+void begin_command(VkCommandBuffer command_buffer, VkCommandBufferUsageFlags flags) {
+  VkCommandBufferBeginInfo command_buffer_begin_info = {};
+  command_buffer_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  command_buffer_begin_info.flags                    = flags;
+  command_buffer_begin_info.pInheritanceInfo         = nullptr;
+
+  VK_CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
+}
+
+static VkCommandPool create_command_pool(Device* device, bool one_time_use) {
+  VkCommandPoolCreateInfo command_pool_create_info = {};
+  command_pool_create_info.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  command_pool_create_info.flags                   = one_time_use ? VK_COMMAND_POOL_CREATE_TRANSIENT_BIT : 0;
+  command_pool_create_info.queueFamilyIndex        = device->queue_family;
+
+  VkCommandPool command_pool;
+  VK_CHECK(vkCreateCommandPool(device->logical, &command_pool_create_info, device->allocator_callbacks, &command_pool));
+  return command_pool;
+}
+
+static VkCommandBuffer allocate_command_buffer(Device* device, VkCommandPool command_pool, bool primary) {
+  VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
+  command_buffer_allocate_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  command_buffer_allocate_info.commandPool                 = command_pool;
+  command_buffer_allocate_info.level = primary ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+  command_buffer_allocate_info.commandBufferCount = 1;
+  VkCommandBuffer command_buffer;
+  VK_CHECK(vkAllocateCommandBuffers(device->logical, &command_buffer_allocate_info, &command_buffer));
+  return command_buffer;
+}
+
+static VkFence create_fence(Device* device, bool should_signal) {
+  VkFenceCreateInfo fence_create_info = {};
+  fence_create_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fence_create_info.pNext             = nullptr;
+  fence_create_info.flags             = should_signal ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
+  VkFence fence;
+  VK_CHECK(vkCreateFence(device->logical, &fence_create_info, device->allocator_callbacks, &fence));
+  return fence;
+}
+
 static u64 read_file(Linear_Allocator& arena, char** buffer, const char* file_name) {
   assert(buffer);
   FILE* fp = nullptr;
   fopen_s(&fp, file_name, "rb");
   defer { fclose(fp); };
 
-  if(!fp) return 0;
+  if (!fp) return 0;
 
   fseek(fp, 0L, SEEK_END);
   u64 sz = ftell(fp);
   // fseek(fp, 0L, SEEK_SET);
   rewind(fp);
   *buffer = arena.push_array_no_init<char>(sz);
-  sz = fread(*buffer, 1, sz, fp);
+  sz      = fread(*buffer, 1, sz, fp);
   return sz;
 }
 
@@ -155,7 +197,7 @@ int main(int, char**) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
-  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
+  // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
 
   ImGui::StyleColorsDark();
 
@@ -164,9 +206,6 @@ int main(int, char**) {
     style.WindowRounding              = 0.0f;
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }
-
-  ImGui_ImplGlfw_InitForVulkan(window, true);
-  defer { ImGui_ImplGlfw_Shutdown(); };
 
   int w, h;
   glfwGetFramebufferSize(window, &w, &h);
@@ -192,8 +231,7 @@ int main(int, char**) {
   bool show_another_window = false;
   ImVec4 clear_color       = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-
-  char* buffer = nullptr;
+  char* buffer    = nullptr;
   u64 buffer_size = read_file(temp_allocator, &buffer, "kernel/gradient.comp.spv");
   assert(buffer_size != 0);
 
@@ -204,74 +242,100 @@ int main(int, char**) {
   comp_shader_create_info.pCode                    = (u32*)buffer;
 
   VkShaderModule comp_shader_module = { 0 };
-  VK_CHECK(vkCreateShaderModule(
-      device.logical,
-      &comp_shader_create_info,
-      device.allocator_callbacks,
-      &comp_shader_module));
+  VK_CHECK(
+      vkCreateShaderModule(device.logical, &comp_shader_create_info, device.allocator_callbacks, &comp_shader_module));
   defer { vkDestroyShaderModule(device.logical, comp_shader_module, device.allocator_callbacks); };
 
   temp_allocator.clear();
-  
+
   const u32 num_bindings = 1;
   VkDescriptorSetLayoutBinding binding[num_bindings];
-  binding[0].binding = 0;
+  binding[0].binding         = 0;
   binding[0].descriptorCount = 1;
-  binding[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-  binding[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+  binding[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  binding[0].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
 
   VkDescriptorSetLayoutCreateInfo layout_create_info = {};
-  layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layout_create_info.pNext = nullptr;
-  layout_create_info.pBindings = binding;
-  layout_create_info.bindingCount = ARRAY_SIZE(binding);
-  layout_create_info.flags = 0;
-  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+  layout_create_info.sType                           = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layout_create_info.pNext                           = nullptr;
+  layout_create_info.pBindings                       = binding;
+  layout_create_info.bindingCount                    = ARRAY_SIZE(binding);
+  layout_create_info.flags                           = 0;
+  VkDescriptorSetLayout layout                       = VK_NULL_HANDLE;
   VK_CHECK(vkCreateDescriptorSetLayout(device.logical, &layout_create_info, device.allocator_callbacks, &layout));
   defer { vkDestroyDescriptorSetLayout(device.logical, layout, device.allocator_callbacks); };
 
-
   VkDescriptorPoolSize descriptor_pool_size[1];
   descriptor_pool_size[0].descriptorCount = 1;
-  descriptor_pool_size[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-  VkDescriptorPoolCreateInfo pool_info = {};
-  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	pool_info.flags = 0;
-	pool_info.maxSets = 10;
-	pool_info.poolSizeCount = ARRAY_SIZE(descriptor_pool_size);
-	pool_info.pPoolSizes = descriptor_pool_size;
+  descriptor_pool_size[0].type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  VkDescriptorPoolCreateInfo pool_info    = {};
+  pool_info.sType                         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  pool_info.flags                         = 0;
+  pool_info.maxSets                       = 10;
+  pool_info.poolSizeCount                 = ARRAY_SIZE(descriptor_pool_size);
+  pool_info.pPoolSizes                    = descriptor_pool_size;
 
   VkDescriptorPool pool;
   VK_CHECK(vkCreateDescriptorPool(device.logical, &pool_info, device.allocator_callbacks, &pool));
   defer { vkDestroyDescriptorPool(device.logical, pool, device.allocator_callbacks); };
   // vkResetDescriptorPool(device.logical, pool, 0);
 
+  VkDescriptorPoolSize imgui_pool_sizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+                                              { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } };
+
+  VkDescriptorPoolCreateInfo imgui_pool_info = {};
+  imgui_pool_info.sType                      = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  imgui_pool_info.flags                      = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  imgui_pool_info.maxSets                    = 1000;
+  imgui_pool_info.poolSizeCount              = ARRAY_SIZE(imgui_pool_sizes);
+  imgui_pool_info.pPoolSizes                 = imgui_pool_sizes;
+
+  VkDescriptorPool imgui_pool;
+  VK_CHECK(vkCreateDescriptorPool(device.logical, &imgui_pool_info, device.allocator_callbacks, &imgui_pool));
+  defer { vkDestroyDescriptorPool(device.logical, imgui_pool, device.allocator_callbacks); };
+
   // VkPipeline pipeline;
   VkPipelineLayoutCreateInfo compute_layout_create_info{};
-	compute_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	compute_layout_create_info.pNext = nullptr;
-	compute_layout_create_info.pSetLayouts = &layout;
-	compute_layout_create_info.setLayoutCount = 1;
+  compute_layout_create_info.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  compute_layout_create_info.pNext          = nullptr;
+  compute_layout_create_info.pSetLayouts    = &layout;
+  compute_layout_create_info.setLayoutCount = 1;
 
   VkPipelineLayout compute_layout;
-	VK_CHECK(vkCreatePipelineLayout(device.logical, &compute_layout_create_info, device.allocator_callbacks, &compute_layout));
-  defer {vkDestroyPipelineLayout(device.logical, compute_layout, device.allocator_callbacks); };
+  VK_CHECK(
+      vkCreatePipelineLayout(device.logical, &compute_layout_create_info, device.allocator_callbacks, &compute_layout));
+  defer { vkDestroyPipelineLayout(device.logical, compute_layout, device.allocator_callbacks); };
 
   VkPipelineShaderStageCreateInfo pipeline_stage_info{};
-	pipeline_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	pipeline_stage_info.pNext = nullptr;
-	pipeline_stage_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	pipeline_stage_info.module = comp_shader_module;
-	pipeline_stage_info.pName = "main";
+  pipeline_stage_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  pipeline_stage_info.pNext  = nullptr;
+  pipeline_stage_info.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+  pipeline_stage_info.module = comp_shader_module;
+  pipeline_stage_info.pName  = "main";
 
-	VkComputePipelineCreateInfo compute_pipeline_create_info{};
-	compute_pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	compute_pipeline_create_info.pNext = nullptr;
-	compute_pipeline_create_info.layout = compute_layout;
-	compute_pipeline_create_info.stage = pipeline_stage_info;
-	
+  VkComputePipelineCreateInfo compute_pipeline_create_info{};
+  compute_pipeline_create_info.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  compute_pipeline_create_info.pNext  = nullptr;
+  compute_pipeline_create_info.layout = compute_layout;
+  compute_pipeline_create_info.stage  = pipeline_stage_info;
+
   VkPipeline compute_pipeline;
-	VK_CHECK(vkCreateComputePipelines(device.logical, VK_NULL_HANDLE, 1, &compute_pipeline_create_info, nullptr, &compute_pipeline));
+  VK_CHECK(vkCreateComputePipelines(
+      device.logical,
+      VK_NULL_HANDLE,
+      1,
+      &compute_pipeline_create_info,
+      nullptr,
+      &compute_pipeline));
   defer { vkDestroyPipeline(device.logical, compute_pipeline, device.allocator_callbacks); };
 
   struct Frame_Data {
@@ -315,27 +379,10 @@ int main(int, char**) {
   VmaAllocationInfo alloc_info = {};
 
   for (auto i = 0; i < num_images; ++i) {
-    VkCommandPoolCreateInfo command_pool_create_info = {};
-    command_pool_create_info.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    command_pool_create_info.flags                   = 0;
-    command_pool_create_info.queueFamilyIndex        = device.queue_family;
-    VK_CHECK(vkCreateCommandPool(
-        device.logical,
-        &command_pool_create_info,
-        device.allocator_callbacks,
-        &frame_data[i].command_pool));
+    frame_data[i].command_pool   = create_command_pool(&device, false);
+    frame_data[i].command_buffer = allocate_command_buffer(&device, frame_data[i].command_pool, true);
+    frame_data[i].fence          = create_fence(&device, true);
 
-    VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
-    command_buffer_allocate_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    command_buffer_allocate_info.commandPool                 = frame_data[i].command_pool;
-    command_buffer_allocate_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    command_buffer_allocate_info.commandBufferCount          = 1;
-    VK_CHECK(vkAllocateCommandBuffers(device.logical, &command_buffer_allocate_info, &frame_data[i].command_buffer));
-
-    VkFenceCreateInfo fence_create_info = {};
-    fence_create_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fence_create_info.flags             = VK_FENCE_CREATE_SIGNALED_BIT;
-    VK_CHECK(vkCreateFence(device.logical, &fence_create_info, device.allocator_callbacks, &frame_data[i].fence));
     VK_CHECK(vmaCreateImage(
         device.allocator,
         &rt_create_info,
@@ -364,28 +411,28 @@ int main(int, char**) {
         &frame_data[i].render_target.view));
     frame_data[i].render_target.extent = rt_extent;
     frame_data[i].render_target.format = rt_format;
-    
+
     VkDescriptorSetAllocateInfo set_alloc_info = {};
-    set_alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    set_alloc_info.pNext = nullptr;
-    set_alloc_info.descriptorPool = pool;
-    set_alloc_info.descriptorSetCount = 1;
-    set_alloc_info.pSetLayouts = &layout;
+    set_alloc_info.sType                       = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    set_alloc_info.pNext                       = nullptr;
+    set_alloc_info.descriptorPool              = pool;
+    set_alloc_info.descriptorSetCount          = 1;
+    set_alloc_info.pSetLayouts                 = &layout;
     VK_CHECK(vkAllocateDescriptorSets(device.logical, &set_alloc_info, &frame_data[i].set));
 
     VkDescriptorImageInfo image_info{};
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    image_info.imageView = frame_data[i].render_target.view;
-    
+    image_info.imageView   = frame_data[i].render_target.view;
+
     VkWriteDescriptorSet draw_image_write = {};
-    draw_image_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    draw_image_write.pNext = nullptr;
-    
-    draw_image_write.dstBinding = 0;
-    draw_image_write.dstSet = frame_data[i].set;
+    draw_image_write.sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    draw_image_write.pNext                = nullptr;
+
+    draw_image_write.dstBinding      = 0;
+    draw_image_write.dstSet          = frame_data[i].set;
     draw_image_write.descriptorCount = 1;
-    draw_image_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    draw_image_write.pImageInfo = &image_info;
+    draw_image_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    draw_image_write.pImageInfo      = &image_info;
     vkUpdateDescriptorSets(device.logical, 1, &draw_image_write, 0, nullptr);
   }
 
@@ -399,8 +446,40 @@ int main(int, char**) {
   };
 
   u8 sync_idx = 0;
+
+  ImGui_ImplGlfw_InitForVulkan(window, true);
+  defer { ImGui_ImplGlfw_Shutdown(); };
+
+  VkPipelineRenderingCreateInfoKHR dynamic_rendering_create_info = {};
+  dynamic_rendering_create_info.sType                            = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+  dynamic_rendering_create_info.pNext                            = nullptr;
+  dynamic_rendering_create_info.pColorAttachmentFormats          = &surface.format.format;
+  dynamic_rendering_create_info.colorAttachmentCount             = 1;
+
+  // this initializes imgui for Vulkan
+  ImGui_ImplVulkan_InitInfo init_info = {};
+  init_info.Instance                  = device.instance;
+  init_info.PhysicalDevice            = device.physical;
+  init_info.Device                    = device.logical;
+  init_info.Queue                     = device.queue;
+  init_info.DescriptorPool            = imgui_pool;
+  init_info.MinImageCount             = surface.num_images;
+  init_info.ImageCount                = surface.num_images;
+  init_info.UseDynamicRendering       = true;
+  init_info.Allocator                 = device.allocator_callbacks;
+  init_info.PipelineRenderingCreateInfo = dynamic_rendering_create_info;
+  ImGui_ImplVulkan_Init(&init_info);
+  defer { ImGui_ImplVulkan_Shutdown(); };
+
+  ImGui_ImplVulkan_CreateFontsTexture();
+
+  // main loop
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    ImGui::ShowDemoWindow();
+    ImGui::Render();
 
     auto& current_frame = frame_data[surface.frame_idx];
     VK_CHECK(vkWaitForFences(device.logical, 1, &current_frame.fence, true, UINT64_MAX));
@@ -420,12 +499,7 @@ int main(int, char**) {
 
     vkResetCommandPool(device.logical, current_frame.command_pool, 0);
 
-    VkCommandBufferBeginInfo command_buffer_begin_info = {};
-    command_buffer_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    command_buffer_begin_info.flags                    = 0;
-    command_buffer_begin_info.pInheritanceInfo         = nullptr;
-
-    VK_CHECK(vkBeginCommandBuffer(current_frame.command_buffer, &command_buffer_begin_info));
+    begin_command(current_frame.command_buffer, 0);
 
     transition_image(
         current_frame.command_buffer,
@@ -436,10 +510,23 @@ int main(int, char**) {
     vkCmdBindPipeline(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
-    vkCmdBindDescriptorSets(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_layout, 0, 1, &current_frame.set, 0, nullptr);
+    vkCmdBindDescriptorSets(
+        current_frame.command_buffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        compute_layout,
+        0,
+        1,
+        &current_frame.set,
+        0,
+        nullptr);
 
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
-    vkCmdDispatch(current_frame.command_buffer, (u32)ceil(current_frame.render_target.extent.width / 16.0), (u32)ceil(current_frame.render_target.extent.height / 16.0), 1);
+    vkCmdDispatch(
+        current_frame.command_buffer,
+        (u32)ceil(current_frame.render_target.extent.width / 16.0),
+        (u32)ceil(current_frame.render_target.extent.height / 16.0),
+        1);
+
     // // make a clear-color from frame number. This will flash with a 120 frame period.
     // VkClearColorValue clear_value = { { 0.0f, 0.0f, (float)fabs(sin(acc / 120.f)), 1.0f } };
 
@@ -469,6 +556,7 @@ int main(int, char**) {
         surface.images[surface.frame_idx],
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
     VkExtent2D render_extent = { current_frame.render_target.extent.width, current_frame.render_target.extent.height };
 
     VkExtent2D surface_extent = { (u32)surface.width, (u32)surface.height };
@@ -483,6 +571,35 @@ int main(int, char**) {
         current_frame.command_buffer,
         surface.images[surface.frame_idx],
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkRenderingAttachmentInfo color_attachment = {};
+    color_attachment.sType                     = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    color_attachment.pNext                     = nullptr;
+    color_attachment.imageView                 = surface.image_views[surface.frame_idx];
+    color_attachment.imageLayout               = VK_IMAGE_LAYOUT_GENERAL;
+    color_attachment.loadOp =
+        VK_ATTACHMENT_LOAD_OP_LOAD; // clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    // if (clear)  color_attachment.clearValue = *clear;
+    VkRenderingInfo render_info      = {}; // vkinit::rendering_info(_swapchainExtent, &colorAttachment, nullptr);
+    render_info.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    render_info.pNext                = nullptr;
+    render_info.colorAttachmentCount = 1;
+    render_info.pColorAttachments    = &color_attachment;
+    render_info.layerCount = 1;
+    VkRect2D rect                    = {};
+    rect.extent                      = surface_extent;
+    render_info.renderArea           = rect;
+
+    vkCmdBeginRendering(current_frame.command_buffer, &render_info);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), current_frame.command_buffer);
+    vkCmdEndRendering(current_frame.command_buffer);
+
+    transition_image(
+        current_frame.command_buffer,
+        surface.images[surface.frame_idx],
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(current_frame.command_buffer));
