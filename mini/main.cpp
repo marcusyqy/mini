@@ -644,6 +644,7 @@ int main(int, char**) {
     vkCmdBindPipeline(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, selected_background_effect.pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
+
     vkCmdBindDescriptorSets(
         current_frame.command_buffer,
         VK_PIPELINE_BIND_POINT_COMPUTE,
