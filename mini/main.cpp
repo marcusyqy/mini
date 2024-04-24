@@ -457,16 +457,16 @@ int main(int, char**) {
   dynamic_rendering_create_info.colorAttachmentCount             = 1;
 
   // this initializes imgui for Vulkan
-  ImGui_ImplVulkan_InitInfo init_info = {};
-  init_info.Instance                  = device.instance;
-  init_info.PhysicalDevice            = device.physical;
-  init_info.Device                    = device.logical;
-  init_info.Queue                     = device.queue;
-  init_info.DescriptorPool            = imgui_pool;
-  init_info.MinImageCount             = surface.num_images;
-  init_info.ImageCount                = surface.num_images;
-  init_info.UseDynamicRendering       = true;
-  init_info.Allocator                 = device.allocator_callbacks;
+  ImGui_ImplVulkan_InitInfo init_info   = {};
+  init_info.Instance                    = device.instance;
+  init_info.PhysicalDevice              = device.physical;
+  init_info.Device                      = device.logical;
+  init_info.Queue                       = device.queue;
+  init_info.DescriptorPool              = imgui_pool;
+  init_info.MinImageCount               = surface.num_images;
+  init_info.ImageCount                  = surface.num_images;
+  init_info.UseDynamicRendering         = true;
+  init_info.Allocator                   = device.allocator_callbacks;
   init_info.PipelineRenderingCreateInfo = dynamic_rendering_create_info;
   ImGui_ImplVulkan_Init(&init_info);
   defer { ImGui_ImplVulkan_Shutdown(); };
@@ -480,6 +480,10 @@ int main(int, char**) {
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
     ImGui::Render();
+
+    auto main_draw_data          = ImGui::GetDrawData();
+    const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
+    if (main_is_minimized)  continue; 
 
     auto& current_frame = frame_data[surface.frame_idx];
     VK_CHECK(vkWaitForFences(device.logical, 1, &current_frame.fence, true, UINT64_MAX));
@@ -587,13 +591,14 @@ int main(int, char**) {
     render_info.pNext                = nullptr;
     render_info.colorAttachmentCount = 1;
     render_info.pColorAttachments    = &color_attachment;
-    render_info.layerCount = 1;
+    render_info.layerCount           = 1;
     VkRect2D rect                    = {};
     rect.extent                      = surface_extent;
     render_info.renderArea           = rect;
 
     vkCmdBeginRendering(current_frame.command_buffer, &render_info);
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), current_frame.command_buffer);
+
+    ImGui_ImplVulkan_RenderDrawData(main_draw_data, current_frame.command_buffer);
     vkCmdEndRendering(current_frame.command_buffer);
 
     transition_image(
@@ -603,6 +608,11 @@ int main(int, char**) {
         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(current_frame.command_buffer));
+
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+      ImGui::UpdatePlatformWindows();
+      ImGui::RenderPlatformWindowsDefault();
+    }
 
     VkCommandBufferSubmitInfo command_buffer_submit_info = {};
     command_buffer_submit_info.sType                     = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
