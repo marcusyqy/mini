@@ -30,8 +30,6 @@ static u64 read_file(Linear_Allocator& arena, char** buffer, const char* file_na
   fopen_s(&fp, file_name, "rb");
   defer { fclose(fp); };
 
-
-
   if(!fp) return 0;
 
   fseek(fp, 0L, SEEK_END);
