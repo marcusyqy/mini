@@ -24,20 +24,22 @@ static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
 }
 
-static u64 read_file(Temp_Linear_Allocator arena, char** buffer, const char* file_name) {
+static u64 read_file(Linear_Allocator& arena, char** buffer, const char* file_name) {
   assert(buffer);
   FILE* fp = nullptr;
-  fopen_s(&fp, file_name, "r");
+  fopen_s(&fp, file_name, "rb");
   defer { fclose(fp); };
+
+
 
   if(!fp) return 0;
 
   fseek(fp, 0L, SEEK_END);
   u64 sz = ftell(fp);
+  // fseek(fp, 0L, SEEK_SET);
   rewind(fp);
-
   *buffer = arena.push_array_no_init<char>(sz);
-  fgets(*buffer, (int)sz, fp);
+  sz = fread(*buffer, 1, sz, fp);
   return sz;
 }
 
@@ -193,7 +195,7 @@ int main(int, char**) {
   ImVec4 clear_color       = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 
-  char* buffer;
+  char* buffer = nullptr;
   u64 buffer_size = read_file(temp_allocator, &buffer, "kernel/gradient.comp.spv");
   assert(buffer_size != 0);
 
@@ -211,8 +213,68 @@ int main(int, char**) {
       &comp_shader_module));
   defer { vkDestroyShaderModule(device.logical, comp_shader_module, device.allocator_callbacks); };
 
+  temp_allocator.clear();
+  
+  const u32 num_bindings = 1;
+  VkDescriptorSetLayoutBinding binding[num_bindings];
+  binding[0].binding = 0;
+  binding[0].descriptorCount = 1;
+  binding[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  binding[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+  VkDescriptorSetLayoutCreateInfo layout_create_info = {};
+  layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layout_create_info.pNext = nullptr;
+  layout_create_info.pBindings = binding;
+  layout_create_info.bindingCount = ARRAY_SIZE(binding);
+  layout_create_info.flags = 0;
+  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+  VK_CHECK(vkCreateDescriptorSetLayout(device.logical, &layout_create_info, device.allocator_callbacks, &layout));
+  defer { vkDestroyDescriptorSetLayout(device.logical, layout, device.allocator_callbacks); };
+
+
+  VkDescriptorPoolSize descriptor_pool_size[1];
+  descriptor_pool_size[0].descriptorCount = 1;
+  descriptor_pool_size[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  VkDescriptorPoolCreateInfo pool_info = {};
+  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = 0;
+	pool_info.maxSets = 10;
+	pool_info.poolSizeCount = ARRAY_SIZE(descriptor_pool_size);
+	pool_info.pPoolSizes = descriptor_pool_size;
+
+  VkDescriptorPool pool;
+  VK_CHECK(vkCreateDescriptorPool(device.logical, &pool_info, device.allocator_callbacks, &pool));
+  defer { vkDestroyDescriptorPool(device.logical, pool, device.allocator_callbacks); };
+  // vkResetDescriptorPool(device.logical, pool, 0);
 
   // VkPipeline pipeline;
+  VkPipelineLayoutCreateInfo compute_layout_create_info{};
+	compute_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	compute_layout_create_info.pNext = nullptr;
+	compute_layout_create_info.pSetLayouts = &layout;
+	compute_layout_create_info.setLayoutCount = 1;
+
+  VkPipelineLayout compute_layout;
+	VK_CHECK(vkCreatePipelineLayout(device.logical, &compute_layout_create_info, device.allocator_callbacks, &compute_layout));
+  defer {vkDestroyPipelineLayout(device.logical, compute_layout, device.allocator_callbacks); };
+
+  VkPipelineShaderStageCreateInfo pipeline_stage_info{};
+	pipeline_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	pipeline_stage_info.pNext = nullptr;
+	pipeline_stage_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	pipeline_stage_info.module = comp_shader_module;
+	pipeline_stage_info.pName = "main";
+
+	VkComputePipelineCreateInfo compute_pipeline_create_info{};
+	compute_pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	compute_pipeline_create_info.pNext = nullptr;
+	compute_pipeline_create_info.layout = compute_layout;
+	compute_pipeline_create_info.stage = pipeline_stage_info;
+	
+  VkPipeline compute_pipeline;
+	VK_CHECK(vkCreateComputePipelines(device.logical, VK_NULL_HANDLE, 1, &compute_pipeline_create_info, nullptr, &compute_pipeline));
+  defer { vkDestroyPipeline(device.logical, compute_pipeline, device.allocator_callbacks); };
 
   struct Frame_Data {
     VkCommandPool command_pool;
@@ -220,7 +282,7 @@ int main(int, char**) {
     VkCommandBuffer command_buffer;
     VkFramebuffer framebuffer;
     Image render_target;
-    Delay_Queue deletion_queue;
+    VkDescriptorSet set;
   };
 
   u64 acc = 0;
@@ -304,6 +366,29 @@ int main(int, char**) {
         &frame_data[i].render_target.view));
     frame_data[i].render_target.extent = rt_extent;
     frame_data[i].render_target.format = rt_format;
+    
+    VkDescriptorSetAllocateInfo set_alloc_info = {};
+    set_alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    set_alloc_info.pNext = nullptr;
+    set_alloc_info.descriptorPool = pool;
+    set_alloc_info.descriptorSetCount = 1;
+    set_alloc_info.pSetLayouts = &layout;
+    VK_CHECK(vkAllocateDescriptorSets(device.logical, &set_alloc_info, &frame_data[i].set));
+
+    VkDescriptorImageInfo image_info{};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_info.imageView = frame_data[i].render_target.view;
+    
+    VkWriteDescriptorSet draw_image_write = {};
+    draw_image_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    draw_image_write.pNext = nullptr;
+    
+    draw_image_write.dstBinding = 0;
+    draw_image_write.dstSet = frame_data[i].set;
+    draw_image_write.descriptorCount = 1;
+    draw_image_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    draw_image_write.pImageInfo = &image_info;
+    vkUpdateDescriptorSets(device.logical, 1, &draw_image_write, 0, nullptr);
   }
 
   defer {
@@ -350,24 +435,31 @@ int main(int, char**) {
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
-    // make a clear-color from frame number. This will flash with a 120 frame period.
-    VkClearColorValue clear_value = { { 0.0f, 0.0f, (float)fabs(sin(acc / 120.f)), 1.0f } };
+    vkCmdBindPipeline(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
 
-    VkImageSubresourceRange clear_range = {};
-    clear_range.aspectMask              = VK_IMAGE_ASPECT_COLOR_BIT;
-    clear_range.baseMipLevel            = 0;
-    clear_range.levelCount              = VK_REMAINING_MIP_LEVELS;
-    clear_range.baseArrayLayer          = 0;
-    clear_range.layerCount              = VK_REMAINING_ARRAY_LAYERS;
+    // bind the descriptor set containing the draw image for the compute pipeline
+    vkCmdBindDescriptorSets(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_layout, 0, 1, &current_frame.set, 0, nullptr);
 
-    // clear image
-    vkCmdClearColorImage(
-        current_frame.command_buffer,
-        current_frame.render_target.image,
-        VK_IMAGE_LAYOUT_GENERAL,
-        &clear_value,
-        1,
-        &clear_range);
+    // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
+    vkCmdDispatch(current_frame.command_buffer, (u32)ceil(current_frame.render_target.extent.width / 16.0), (u32)ceil(current_frame.render_target.extent.height / 16.0), 1);
+    // // make a clear-color from frame number. This will flash with a 120 frame period.
+    // VkClearColorValue clear_value = { { 0.0f, 0.0f, (float)fabs(sin(acc / 120.f)), 1.0f } };
+
+    // VkImageSubresourceRange clear_range = {};
+    // clear_range.aspectMask              = VK_IMAGE_ASPECT_COLOR_BIT;
+    // clear_range.baseMipLevel            = 0;
+    // clear_range.levelCount              = VK_REMAINING_MIP_LEVELS;
+    // clear_range.baseArrayLayer          = 0;
+    // clear_range.layerCount              = VK_REMAINING_ARRAY_LAYERS;
+
+    // // clear image
+    // vkCmdClearColorImage(
+    //     current_frame.command_buffer,
+    //     current_frame.render_target.image,
+    //     VK_IMAGE_LAYOUT_GENERAL,
+    //     &clear_value,
+    //     1,
+    //     &clear_range);
 
     transition_image(
         current_frame.command_buffer,
