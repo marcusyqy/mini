@@ -30,7 +30,7 @@ float noisy_star_field(in vec2 sample_pos, float threshold) {
 }
 
 // Stabilize noisy_star_field() by only sampling at integer values.
-float stable_star_field( in vec2 sample_pos, float threshold ) {
+float stable_star_field(in vec2 sample_pos, float threshold) {
   // Linear interpolation between four samples.
   // Note: This approach has some visual artifacts.
   // There must be a better way to "anti alias" the star field.
@@ -49,8 +49,7 @@ float stable_star_field( in vec2 sample_pos, float threshold ) {
 	return star_val;
 }
 
-void main_image( out vec4 frag_color, in vec2 frag_coord ) {
-  vec2 resolution = imageSize(image);
+void main_image(out vec4 frag_color, in vec2 frag_coord, in vec2 resolution) {
   // Sky Background Color
   //vec3 color = vec3( 0.1, 0.2, 0.4 ) * frag_coord.y / resolution.y;
   vec3 color = push_constants.data1.xyz * frag_coord.y / resolution.y;
@@ -76,7 +75,7 @@ void main() {
 	ivec2 size = imageSize(image);
   if(texel_coord.x < size.x && texel_coord.y < size.y) {
     vec4 color;
-    main_image(color,texel_coord);
+    main_image(color, texel_coord, size);
     imageStore(image, texel_coord, color);
   }   
 }
