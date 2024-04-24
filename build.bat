@@ -7,13 +7,17 @@ for %%a in (%*) do set "%%a=1"
 if not "%release%"=="1" set debug=1
 if "%debug%"=="1"   set release=0 && echo [debug mode]
 if "%release%"=="1" set debug=0 && echo [release mode]
-if "%~1"==""        echo [default mode] && set main=1
+if "%~1"==""        echo [default mode] && (
+  set kernel=1
+  set main=1
+)
 
 if "%all%" == "1" (
     set glfw=1
     set imgui=1
     set adapter=1
     set main=1
+    set kernel=1
 )
 
 if "%clean%" == "1" (
@@ -36,6 +40,19 @@ if "%imgui%"=="1" set build_imgui= call build && echo [BUILDING IMGUI]
 pushd extra\imgui
 %build_imgui%
 popd
+
+:: build kernel
+set build_kernel=
+if "%kernel%"=="1" set build_kernel= call build && echo [BUILDING KERNEL]
+pushd extra\kernel
+%build_kernel% 
+REM copies shaders.
+if "%kernel%"=="1" (
+    if exist ..\..\build\kernel rd /s /q ..\..\build\kernel
+    (echo D | xcopy build ..\..\build\kernel /f /E /A) > nul 
+)
+popd
+
 
 :: build adapter
 set build_adapter=

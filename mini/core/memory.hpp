@@ -124,14 +124,14 @@ struct Linear_Allocator {
   }
 
   template <typename T>
-  T* push_array_no_init(u32 N) {
+  T* push_array_no_init(u64 N) {
     auto p = push(sizeof(T) * N, alignof(T));
     static_assert(std::is_trivially_destructible_v<T>, "Must be defaultly destructible to use no_init");
     return (T*)p;
   }
 
   template <typename T>
-  T* push_array_zero(u32 N) {
+  T* push_array_zero(u64 N) {
     auto p = push_array_no_init<T>(N);
     memset(p, 0, sizeof(T) * N);
     static_assert(std::is_trivially_destructible_v<T>, "Removing all destructible code.");
@@ -189,12 +189,12 @@ struct Temp_Linear_Allocator {
   }
 
   template <typename T>
-  T* push_array_no_init(u32 N) {
+  T* push_array_no_init(u64 N) {
     return save_point.allocator->push_array_no_init<T>(N);
   }
 
   template <typename T>
-  T* push_array_zero(u32 N) {
+  T* push_array_zero(u64 N) {
     return save_point.allocator->push_array_zero<T>(N);
   }
 

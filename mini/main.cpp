@@ -18,78 +18,106 @@
 
 #include "embed/color.frag"
 #include "embed/color.vert"
+#include <cstdio>
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
 }
 
-static void copy_image_to_image(VkCommandBuffer cmd, VkImage src_image, VkImage destination, VkExtent2D src_size, VkExtent2D dst_size)
-{
-	VkImageBlit2 blit_region = {}; 
-  blit_region.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2; 
-  blit_region.pNext = nullptr;
+static u64 read_file(Temp_Linear_Allocator arena, char** buffer, const char* file_name) {
+  assert(buffer);
+  FILE* fp = nullptr;
+  fopen_s(&fp, file_name, "r");
+  defer { fclose(fp); };
 
-	blit_region.srcOffsets[1].x = src_size.width;
-	blit_region.srcOffsets[1].y = src_size.height;
-	blit_region.srcOffsets[1].z = 1;
+  if(!fp) return 0;
 
-	blit_region.dstOffsets[1].x = dst_size.width;
-	blit_region.dstOffsets[1].y = dst_size.height;
-	blit_region.dstOffsets[1].z = 1;
+  fseek(fp, 0L, SEEK_END);
+  u64 sz = ftell(fp);
+  rewind(fp);
 
-	blit_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	blit_region.srcSubresource.baseArrayLayer = 0;
-	blit_region.srcSubresource.layerCount = 1;
-	blit_region.srcSubresource.mipLevel = 0;
-
-	blit_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	blit_region.dstSubresource.baseArrayLayer = 0;
-	blit_region.dstSubresource.layerCount = 1;
-	blit_region.dstSubresource.mipLevel = 0;
-
-	VkBlitImageInfo2 blit_info = {}; 
-  blit_info.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2; 
-  blit_info.pNext = nullptr;
-	blit_info.dstImage = destination;
-	blit_info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-	blit_info.srcImage = src_image;
-	blit_info.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-	blit_info.filter = VK_FILTER_LINEAR;
-	blit_info.regionCount = 1;
-	blit_info.pRegions = &blit_region;
-
-	vkCmdBlitImage2(cmd, &blit_info);
+  *buffer = arena.push_array_no_init<char>(sz);
+  fgets(*buffer, (int)sz, fp);
+  return sz;
 }
 
-static void transition_image(VkCommandBuffer command_buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout) {
-  VkImageMemoryBarrier2 image_barrier = {};
-  image_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-  image_barrier.pNext = nullptr;
+static void copy_image_to_image(
+    VkCommandBuffer cmd,
+    VkImage src_image,
+    VkImage destination,
+    VkExtent2D src_size,
+    VkExtent2D dst_size) {
+  VkImageBlit2 blit_region = {};
+  blit_region.sType        = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
+  blit_region.pNext        = nullptr;
 
-  image_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+  blit_region.srcOffsets[1].x = src_size.width;
+  blit_region.srcOffsets[1].y = src_size.height;
+  blit_region.srcOffsets[1].z = 1;
+
+  blit_region.dstOffsets[1].x = dst_size.width;
+  blit_region.dstOffsets[1].y = dst_size.height;
+  blit_region.dstOffsets[1].z = 1;
+
+  blit_region.srcSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit_region.srcSubresource.baseArrayLayer = 0;
+  blit_region.srcSubresource.layerCount     = 1;
+  blit_region.srcSubresource.mipLevel       = 0;
+
+  blit_region.dstSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit_region.dstSubresource.baseArrayLayer = 0;
+  blit_region.dstSubresource.layerCount     = 1;
+  blit_region.dstSubresource.mipLevel       = 0;
+
+  VkBlitImageInfo2 blit_info = {};
+  blit_info.sType            = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;
+  blit_info.pNext            = nullptr;
+  blit_info.dstImage         = destination;
+  blit_info.dstImageLayout   = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  blit_info.srcImage         = src_image;
+  blit_info.srcImageLayout   = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  blit_info.filter           = VK_FILTER_LINEAR;
+  blit_info.regionCount      = 1;
+  blit_info.pRegions         = &blit_region;
+
+  vkCmdBlitImage2(cmd, &blit_info);
+}
+
+static void transition_image(
+    VkCommandBuffer command_buffer,
+    VkImage image,
+    VkImageLayout old_layout,
+    VkImageLayout new_layout) {
+  VkImageMemoryBarrier2 image_barrier = {};
+  image_barrier.sType                 = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+  image_barrier.pNext                 = nullptr;
+
+  image_barrier.srcStageMask  = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
   image_barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-  image_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+  image_barrier.dstStageMask  = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
   image_barrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
 
   image_barrier.oldLayout = old_layout;
   image_barrier.newLayout = new_layout;
 
-  VkImageAspectFlags aspectMask = (image_barrier.newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+  VkImageAspectFlags aspectMask     = (image_barrier.newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+          ? VK_IMAGE_ASPECT_DEPTH_BIT
+          : VK_IMAGE_ASPECT_COLOR_BIT;
   VkImageSubresourceRange sub_image = {};
-  sub_image.aspectMask = aspectMask;
-  sub_image.baseMipLevel = 0;
-  sub_image.levelCount = VK_REMAINING_MIP_LEVELS;
-  sub_image.baseArrayLayer = 0;
-  sub_image.layerCount = VK_REMAINING_ARRAY_LAYERS;
-  image_barrier.subresourceRange = sub_image; 
-  image_barrier.image = image;
+  sub_image.aspectMask              = aspectMask;
+  sub_image.baseMipLevel            = 0;
+  sub_image.levelCount              = VK_REMAINING_MIP_LEVELS;
+  sub_image.baseArrayLayer          = 0;
+  sub_image.layerCount              = VK_REMAINING_ARRAY_LAYERS;
+  image_barrier.subresourceRange    = sub_image;
+  image_barrier.image               = image;
 
   VkDependencyInfo dependency_info = {};
-  dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-  dependency_info.pNext = nullptr;
+  dependency_info.sType            = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+  dependency_info.pNext            = nullptr;
 
   dependency_info.imageMemoryBarrierCount = 1;
-  dependency_info.pImageMemoryBarriers = &image_barrier;
+  dependency_info.pImageMemoryBarriers    = &image_barrier;
   vkCmdPipelineBarrier2(command_buffer, &dependency_info);
 }
 
@@ -105,6 +133,8 @@ int main(int, char**) {
   defer { glfwTerminate(); };
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
   constexpr auto window_name = "Place holder window name";
   GLFWwindow* window         = glfwCreateWindow(1280, 720, window_name, nullptr, nullptr);
   defer { glfwDestroyWindow(window); };
@@ -162,70 +192,28 @@ int main(int, char**) {
   bool show_another_window = false;
   ImVec4 clear_color       = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-  VkShaderModuleCreateInfo vertex_shader_create_info = {};
-  vertex_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  vertex_shader_create_info.pNext                    = nullptr;
-  vertex_shader_create_info.codeSize                 = sizeof(_shader_vert_spv);
-  vertex_shader_create_info.pCode                    = _shader_vert_spv;
 
-  VkShaderModule vertex_shader_module = { 0 };
-  VK_CHECK(vkCreateShaderModule(device.logical, &vertex_shader_create_info, device.allocator_callbacks, &vertex_shader_module));
-  defer { vkDestroyShaderModule(device.logical, vertex_shader_module, device.allocator_callbacks); };
+  char* buffer;
+  u64 buffer_size = read_file(temp_allocator, &buffer, "kernel/gradient.comp.spv");
+  assert(buffer_size != 0);
 
-  VkShaderModuleCreateInfo fragment_shader_create_info = {};
-  fragment_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  fragment_shader_create_info.pNext                    = nullptr;
-  fragment_shader_create_info.codeSize                 = sizeof(_shader_frag_spv);
-  fragment_shader_create_info.pCode                    = _shader_frag_spv;
+  VkShaderModuleCreateInfo comp_shader_create_info = {};
+  comp_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  comp_shader_create_info.pNext                    = nullptr;
+  comp_shader_create_info.codeSize                 = buffer_size;
+  comp_shader_create_info.pCode                    = (u32*)buffer;
 
-  VkShaderModule fragment_shader_module = { 0 };
-  VK_CHECK(
-      vkCreateShaderModule(device.logical, &fragment_shader_create_info, device.allocator_callbacks, &fragment_shader_module));
-  defer { vkDestroyShaderModule(device.logical, fragment_shader_module, device.allocator_callbacks); };
+  VkShaderModule comp_shader_module = { 0 };
+  VK_CHECK(vkCreateShaderModule(
+      device.logical,
+      &comp_shader_create_info,
+      device.allocator_callbacks,
+      &comp_shader_module));
+  defer { vkDestroyShaderModule(device.logical, comp_shader_module, device.allocator_callbacks); };
 
-  VkAttachmentDescription attachment = {};
-  attachment.format                  = surface.format.format;
-  attachment.samples                 = VK_SAMPLE_COUNT_1_BIT;
-  attachment.loadOp                  = VK_ATTACHMENT_LOAD_OP_CLEAR; // clear every frame.
-  attachment.storeOp                 = VK_ATTACHMENT_STORE_OP_STORE;
-  attachment.stencilLoadOp           = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  attachment.stencilStoreOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  attachment.initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
-  attachment.finalLayout             = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  VkAttachmentReference color_attachment = {};
-  color_attachment.attachment            = 0;
-  color_attachment.layout                = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass = {};
-  subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments    = &color_attachment;
-
-  VkSubpassDependency dependency = {};
-  dependency.srcSubpass          = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass          = 0;
-  dependency.srcStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask       = 0;
-  dependency.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  VkRenderPassCreateInfo render_pass_create_info = {};
-  render_pass_create_info.sType                  = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  render_pass_create_info.attachmentCount        = 1;
-  render_pass_create_info.pAttachments           = &attachment;
-  render_pass_create_info.subpassCount           = 1;
-  render_pass_create_info.pSubpasses             = &subpass;
-  render_pass_create_info.dependencyCount        = 1;
-  render_pass_create_info.pDependencies          = &dependency;
-
-  VkRenderPass render_pass;
-  VK_CHECK(vkCreateRenderPass(device.logical, &render_pass_create_info, device.allocator_callbacks, &render_pass));
-  defer { vkDestroyRenderPass(device.logical, render_pass, device.allocator_callbacks); };
 
   // VkPipeline pipeline;
 
-  
   struct Frame_Data {
     VkCommandPool command_pool;
     VkFence fence;
@@ -241,17 +229,18 @@ int main(int, char**) {
   const auto num_images = surface.num_images; // used to test if something changed.
   auto frame_data       = frame_allocator.push_array_no_init<Frame_Data>(surface.num_images);
 
-  VkFormat rt_format = VK_FORMAT_R16G16B16A16_SFLOAT;  
-  VkExtent3D rt_extent = {(u32)surface.width, (u32)surface.height, 1};
-  VkImageUsageFlags rt_usage_flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  VkFormat rt_format               = VK_FORMAT_R16G16B16A16_SFLOAT;
+  VkExtent3D rt_extent             = { (u32)surface.width, (u32)surface.height, 1 };
+  VkImageUsageFlags rt_usage_flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+      VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   VkImageCreateInfo rt_create_info = {};
-  rt_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  rt_create_info.pNext = nullptr;
-  rt_create_info.imageType = VK_IMAGE_TYPE_2D;
-  rt_create_info.format = rt_format;
-  rt_create_info.extent = rt_extent;
-  rt_create_info.mipLevels = 1;
+  rt_create_info.sType             = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  rt_create_info.pNext             = nullptr;
+  rt_create_info.imageType         = VK_IMAGE_TYPE_2D;
+  rt_create_info.format            = rt_format;
+  rt_create_info.extent            = rt_extent;
+  rt_create_info.mipLevels         = 1;
   rt_create_info.arrayLayers       = 1;
   // for MSAA. we will not be using it by default, so default it to 1 sample per pixel.
   rt_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -260,53 +249,66 @@ int main(int, char**) {
   rt_create_info.usage  = rt_usage_flags;
 
   VmaAllocationCreateInfo rt_alloc_info = {};
-	rt_alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-	rt_alloc_info.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  rt_alloc_info.usage                   = VMA_MEMORY_USAGE_GPU_ONLY;
+  rt_alloc_info.requiredFlags           = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
   VmaAllocationInfo alloc_info = {};
 
-
-  for(auto i = 0; i < num_images; ++i) {
+  for (auto i = 0; i < num_images; ++i) {
     VkCommandPoolCreateInfo command_pool_create_info = {};
-    command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    command_pool_create_info.flags = 0;
-    command_pool_create_info.queueFamilyIndex = device.queue_family;
-    VK_CHECK(vkCreateCommandPool(device.logical, &command_pool_create_info, device.allocator_callbacks, &frame_data[i].command_pool));
+    command_pool_create_info.sType                   = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    command_pool_create_info.flags                   = 0;
+    command_pool_create_info.queueFamilyIndex        = device.queue_family;
+    VK_CHECK(vkCreateCommandPool(
+        device.logical,
+        &command_pool_create_info,
+        device.allocator_callbacks,
+        &frame_data[i].command_pool));
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = {};
-    command_buffer_allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    command_buffer_allocate_info.commandPool = frame_data[i].command_pool;
-    command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    command_buffer_allocate_info.commandBufferCount = 1;
+    command_buffer_allocate_info.sType                       = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    command_buffer_allocate_info.commandPool                 = frame_data[i].command_pool;
+    command_buffer_allocate_info.level                       = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    command_buffer_allocate_info.commandBufferCount          = 1;
     VK_CHECK(vkAllocateCommandBuffers(device.logical, &command_buffer_allocate_info, &frame_data[i].command_buffer));
 
     VkFenceCreateInfo fence_create_info = {};
-    fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    fence_create_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_create_info.flags             = VK_FENCE_CREATE_SIGNALED_BIT;
     VK_CHECK(vkCreateFence(device.logical, &fence_create_info, device.allocator_callbacks, &frame_data[i].fence));
-    VK_CHECK(vmaCreateImage(device.allocator, &rt_create_info, &rt_alloc_info, &frame_data[i].render_target.image, &frame_data[i].render_target.allocation, &alloc_info));
+    VK_CHECK(vmaCreateImage(
+        device.allocator,
+        &rt_create_info,
+        &rt_alloc_info,
+        &frame_data[i].render_target.image,
+        &frame_data[i].render_target.allocation,
+        &alloc_info));
     // print alloc_info out here.
 
     VkImageViewCreateInfo rt_view_create_info = {};
-    rt_view_create_info .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    rt_view_create_info.pNext = nullptr;
+    rt_view_create_info.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    rt_view_create_info.pNext                 = nullptr;
 
-    rt_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    rt_view_create_info.image = frame_data[i].render_target.image;
-    rt_view_create_info.format = rt_format;
-    rt_view_create_info.subresourceRange.baseMipLevel = 0;
-    rt_view_create_info.subresourceRange.levelCount = 1;
+    rt_view_create_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    rt_view_create_info.image                           = frame_data[i].render_target.image;
+    rt_view_create_info.format                          = rt_format;
+    rt_view_create_info.subresourceRange.baseMipLevel   = 0;
+    rt_view_create_info.subresourceRange.levelCount     = 1;
     rt_view_create_info.subresourceRange.baseArrayLayer = 0;
-    rt_view_create_info.subresourceRange.layerCount = 1;
-    rt_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    VK_CHECK(vkCreateImageView(device.logical, &rt_view_create_info, device.allocator_callbacks, &frame_data[i].render_target.view));
+    rt_view_create_info.subresourceRange.layerCount     = 1;
+    rt_view_create_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    VK_CHECK(vkCreateImageView(
+        device.logical,
+        &rt_view_create_info,
+        device.allocator_callbacks,
+        &frame_data[i].render_target.view));
     frame_data[i].render_target.extent = rt_extent;
     frame_data[i].render_target.format = rt_format;
   }
 
   defer {
-    for(auto i = 0; i < num_images; ++i) {
-      vkDestroyCommandPool(device.logical, frame_data[i].command_pool,device.allocator_callbacks);
+    for (auto i = 0; i < num_images; ++i) {
+      vkDestroyCommandPool(device.logical, frame_data[i].command_pool, device.allocator_callbacks);
       vkDestroyImageView(device.logical, frame_data[i].render_target.view, device.allocator_callbacks);
       vmaDestroyImage(device.allocator, frame_data[i].render_target.image, frame_data[i].render_target.allocation);
       vkDestroyFence(device.logical, frame_data[i].fence, device.allocator_callbacks);
@@ -321,8 +323,14 @@ int main(int, char**) {
     VK_CHECK(vkWaitForFences(device.logical, 1, &current_frame.fence, true, UINT64_MAX));
     VK_CHECK(vkResetFences(device.logical, 1, &current_frame.fence));
 
-    VkResult result = vkAcquireNextImageKHR(device.logical, surface.swapchain, UINT64_MAX, surface.image_avail[sync_idx], nullptr, &surface.frame_idx);
-    if(result != VK_SUCCESS) {
+    VkResult result = vkAcquireNextImageKHR(
+        device.logical,
+        surface.swapchain,
+        UINT64_MAX,
+        surface.image_avail[sync_idx],
+        nullptr,
+        &surface.frame_idx);
+    if (result != VK_SUCCESS) {
       // may need to resize here.
       continue;
     }
@@ -330,76 +338,102 @@ int main(int, char**) {
     vkResetCommandPool(device.logical, current_frame.command_pool, 0);
 
     VkCommandBufferBeginInfo command_buffer_begin_info = {};
-    command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    command_buffer_begin_info.flags = 0;
-    command_buffer_begin_info.pInheritanceInfo = nullptr;
+    command_buffer_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    command_buffer_begin_info.flags                    = 0;
+    command_buffer_begin_info.pInheritanceInfo         = nullptr;
 
     VK_CHECK(vkBeginCommandBuffer(current_frame.command_buffer, &command_buffer_begin_info));
 
-    transition_image(current_frame.command_buffer, current_frame.render_target.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    transition_image(
+        current_frame.command_buffer,
+        current_frame.render_target.image,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL);
 
-
-    //make a clear-color from frame number. This will flash with a 120 frame period.
+    // make a clear-color from frame number. This will flash with a 120 frame period.
     VkClearColorValue clear_value = { { 0.0f, 0.0f, (float)fabs(sin(acc / 120.f)), 1.0f } };
 
-    VkImageSubresourceRange clear_range =  {};
-    clear_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    clear_range.baseMipLevel = 0;
-    clear_range.levelCount = VK_REMAINING_MIP_LEVELS;
-    clear_range.baseArrayLayer = 0;
-    clear_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    VkImageSubresourceRange clear_range = {};
+    clear_range.aspectMask              = VK_IMAGE_ASPECT_COLOR_BIT;
+    clear_range.baseMipLevel            = 0;
+    clear_range.levelCount              = VK_REMAINING_MIP_LEVELS;
+    clear_range.baseArrayLayer          = 0;
+    clear_range.layerCount              = VK_REMAINING_ARRAY_LAYERS;
 
-    //clear image
-    vkCmdClearColorImage(current_frame.command_buffer, current_frame.render_target.image, VK_IMAGE_LAYOUT_GENERAL, &clear_value, 1, &clear_range);
+    // clear image
+    vkCmdClearColorImage(
+        current_frame.command_buffer,
+        current_frame.render_target.image,
+        VK_IMAGE_LAYOUT_GENERAL,
+        &clear_value,
+        1,
+        &clear_range);
 
-    transition_image(current_frame.command_buffer, current_frame.render_target.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    VkExtent2D render_extent = {current_frame.render_target.extent.width, current_frame.render_target.extent.height};
+    transition_image(
+        current_frame.command_buffer,
+        current_frame.render_target.image,
+        VK_IMAGE_LAYOUT_GENERAL,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transition_image(
+        current_frame.command_buffer,
+        surface.images[surface.frame_idx],
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    VkExtent2D render_extent = { current_frame.render_target.extent.width, current_frame.render_target.extent.height };
 
-    VkExtent2D surface_extent = { (u32)surface.width, (u32)surface.height};
-    copy_image_to_image(current_frame.command_buffer, current_frame.render_target.image, surface.images[surface.frame_idx], render_extent, surface_extent);
+    VkExtent2D surface_extent = { (u32)surface.width, (u32)surface.height };
+    copy_image_to_image(
+        current_frame.command_buffer,
+        current_frame.render_target.image,
+        surface.images[surface.frame_idx],
+        render_extent,
+        surface_extent);
 
-    transition_image(current_frame.command_buffer, surface.images[surface.frame_idx], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    transition_image(
+        current_frame.command_buffer,
+        surface.images[surface.frame_idx],
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(current_frame.command_buffer));
 
     VkCommandBufferSubmitInfo command_buffer_submit_info = {};
-    command_buffer_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-    command_buffer_submit_info.commandBuffer = current_frame.command_buffer;
-    command_buffer_submit_info.deviceMask = 0;
-    command_buffer_submit_info.pNext = nullptr;
+    command_buffer_submit_info.sType                     = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    command_buffer_submit_info.commandBuffer             = current_frame.command_buffer;
+    command_buffer_submit_info.deviceMask                = 0;
+    command_buffer_submit_info.pNext                     = nullptr;
 
     VkSemaphoreSubmitInfo wait_semaphore_submit_info = {};
-    wait_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    wait_semaphore_submit_info.semaphore = surface.image_avail[sync_idx];
-    wait_semaphore_submit_info.deviceIndex = 0;
-    wait_semaphore_submit_info.value = 1;
-    wait_semaphore_submit_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
-    
-    VkSemaphoreSubmitInfo signal_semaphore_submit_info = {};
-    signal_semaphore_submit_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    signal_semaphore_submit_info.semaphore = surface.render_done[sync_idx];
-    signal_semaphore_submit_info.deviceIndex = 0;
-    signal_semaphore_submit_info.value = 1;
-    signal_semaphore_submit_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+    wait_semaphore_submit_info.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    wait_semaphore_submit_info.semaphore             = surface.image_avail[sync_idx];
+    wait_semaphore_submit_info.deviceIndex           = 0;
+    wait_semaphore_submit_info.value                 = 1;
+    wait_semaphore_submit_info.stageMask             = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR;
 
-    VkSubmitInfo2 submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submit_info.commandBufferInfoCount = 1;
-    submit_info.pCommandBufferInfos = &command_buffer_submit_info;
-    submit_info.pWaitSemaphoreInfos = &wait_semaphore_submit_info;
-    submit_info.waitSemaphoreInfoCount = 1;
-    submit_info.pSignalSemaphoreInfos = &signal_semaphore_submit_info;
+    VkSemaphoreSubmitInfo signal_semaphore_submit_info = {};
+    signal_semaphore_submit_info.sType                 = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    signal_semaphore_submit_info.semaphore             = surface.render_done[sync_idx];
+    signal_semaphore_submit_info.deviceIndex           = 0;
+    signal_semaphore_submit_info.value                 = 1;
+    signal_semaphore_submit_info.stageMask             = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+
+    VkSubmitInfo2 submit_info            = {};
+    submit_info.sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit_info.commandBufferInfoCount   = 1;
+    submit_info.pCommandBufferInfos      = &command_buffer_submit_info;
+    submit_info.pWaitSemaphoreInfos      = &wait_semaphore_submit_info;
+    submit_info.waitSemaphoreInfoCount   = 1;
+    submit_info.pSignalSemaphoreInfos    = &signal_semaphore_submit_info;
     submit_info.signalSemaphoreInfoCount = 1;
     VK_CHECK(vkQueueSubmit2(device.queue, 1, &submit_info, current_frame.fence));
 
-    VkPresentInfoKHR present_info = {};
-    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.pImageIndices = &surface.frame_idx;
-    present_info.pSwapchains = &surface.swapchain;
-    present_info.swapchainCount = 1;
+    VkPresentInfoKHR present_info   = {};
+    present_info.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.pImageIndices      = &surface.frame_idx;
+    present_info.pSwapchains        = &surface.swapchain;
+    present_info.swapchainCount     = 1;
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &surface.render_done[sync_idx];
+    present_info.pWaitSemaphores    = &surface.render_done[sync_idx];
     VK_CHECK(vkQueuePresentKHR(device.queue, &present_info));
 
     // acquire after present
@@ -411,7 +445,6 @@ int main(int, char**) {
   vkDeviceWaitIdle(device.logical);
   return 0;
 }
-
 
 #if 0
 // Start the Dear ImGui frame
