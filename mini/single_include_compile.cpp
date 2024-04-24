@@ -10,6 +10,9 @@
 #include "gpu/surface.cpp"
 #include "gpu/sync.cpp"
 
+// os files
+#include "os/os_win32.cpp"
+
 // other files
 #include "log.cpp"
 

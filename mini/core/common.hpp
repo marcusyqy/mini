@@ -26,3 +26,13 @@ T clamp(T val, Disregard_Type<T> min, Disregard_Type<T> max) {
 }
 
 uintptr_t align_forward(uintptr_t ptr, u64 align);
+
+struct Time {
+  u32 year;
+  u32 month;
+  u32 day;
+  u32 hour;
+  u32 minute;
+  u32 second;
+  u32 milli_second;
+};

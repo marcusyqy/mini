@@ -2,7 +2,7 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
-#include <time.h>
+#include "os/os_common.hpp"
 
 namespace helper {
 char buffer[1024];
@@ -55,23 +55,19 @@ void console_log_print_line(Log_Level level, const char* message, ...) {
   int value = vsnprintf(helper::buffer, sizeof(helper::buffer), message, list);
   assert(value >= 0 && value < sizeof(helper::buffer));
 #define RESET_COLOR_IN_CONSOLE "\x1B[0m"
-  // @TODO: add time here as well?
-  // GetSystemTimeAsFileTime
-  time_t rawtime;
-  struct tm timeinfo;
-  time(&rawtime);
-  localtime_s(&timeinfo, &rawtime);
-  const int milli_seconds = 0;
+  
+  Time time = os_get_current_local_time();
+  if(time.hour > 12) time.hour -= 12;
   fprintf(
       stdout,
       "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s%s" RESET_COLOR_IN_CONSOLE "] %s\n",
-      timeinfo.tm_year + 1900,
-      timeinfo.tm_mon,
-      timeinfo.tm_mday,
-      timeinfo.tm_hour,
-      timeinfo.tm_min,
-      timeinfo.tm_sec,
-      milli_seconds,
+      time.year,
+      time.month,
+      time.day,
+      time.hour,
+      time.minute,
+      time.second,
+      time.milli_second,
       helper::to_color(level),
       helper::to_level_string(level),
       helper::buffer);

@@ -147,6 +147,7 @@ static void transition_image(
   VkImageAspectFlags aspectMask     = (image_barrier.newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
           ? VK_IMAGE_ASPECT_DEPTH_BIT
           : VK_IMAGE_ASPECT_COLOR_BIT;
+
   VkImageSubresourceRange sub_image = {};
   sub_image.aspectMask              = aspectMask;
   sub_image.baseMipLevel            = 0;
