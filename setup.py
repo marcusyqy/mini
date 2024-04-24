@@ -12,6 +12,7 @@ includes = [
   "extra/volk", 
   "extra/glm", 
   "extra/vma", 
+  "extra/spdlog/include", 
 ]
 
 def download_vulkan_if_not_available():

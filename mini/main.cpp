@@ -21,6 +21,7 @@
 #include "embed/color.vert"
 #include "glm.hpp"
 #include <cstdio>
+#include "spdlog/spdlog.h"
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
@@ -174,6 +175,7 @@ struct Compute_Push_Constants {
 
 int main(int, char**) {
   log_info("Hello world from %s!!", "Mini Engine");
+  spdlog::info("Hello world from {}!!", "Mini Engine");
 
   // put some allocators here
   Linear_Allocator frame_allocator = { mega_bytes(20) };
