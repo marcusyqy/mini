@@ -175,6 +175,8 @@ struct Compute_Push_Constants {
 
 int main(int, char**) {
   log_info("Hello world from %s!!", "Mini Engine");
+
+  /// @TODO: consider whether we want to keep spdlog. It has nice formatting of time right now.
   spdlog::info("Hello world from {}!!", "Mini Engine");
 
   // put some allocators here
