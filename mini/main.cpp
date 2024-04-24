@@ -20,8 +20,8 @@
 #include "embed/color.frag"
 #include "embed/color.vert"
 #include "glm.hpp"
-#include <cstdio>
 #include "spdlog/spdlog.h"
+#include <cstdio>
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);

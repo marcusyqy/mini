@@ -64,12 +64,12 @@ void console_log_print_line(Log_Level level, const char* message, ...) {
   fprintf(
       stdout,
       "[%04d-%02d-%02d %02d:%02d:%02d] [%s%s" RESET_COLOR_IN_CONSOLE "] %s\n",
-      timeinfo.tm_year + 1900,  
-      timeinfo.tm_mon, 
-      timeinfo.tm_mday, 
-      timeinfo.tm_hour,  
-      timeinfo.tm_min,   
-      timeinfo.tm_sec,   
+      timeinfo.tm_year + 1900,
+      timeinfo.tm_mon,
+      timeinfo.tm_mday,
+      timeinfo.tm_hour,
+      timeinfo.tm_min,
+      timeinfo.tm_sec,
       helper::to_color(level),
       helper::to_level_string(level),
       helper::buffer);
