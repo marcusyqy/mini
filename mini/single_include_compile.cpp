@@ -11,7 +11,6 @@
 #include "gpu/sync.cpp"
 
 // other files
-#include "draw.cpp"
 #include "log.cpp"
 
 // entry point

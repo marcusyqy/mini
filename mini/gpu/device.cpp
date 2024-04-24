@@ -410,7 +410,6 @@ Device create_device(Temp_Linear_Allocator arena) {
 
   VK_CHECK(vkCreateDevice(physical_device, &create_info, allocator_callbacks, &logical_device));
   vkGetDeviceQueue(logical_device, queue_family, 0, &queue);
-  arena.clear();
 
   // initialize the memory allocator
   VmaAllocatorCreateInfo allocator_create_info = {};
@@ -420,6 +419,7 @@ Device create_device(Temp_Linear_Allocator arena) {
   allocator_create_info.flags                  = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   VK_CHECK(vmaCreateAllocator(&allocator_create_info, &device.allocator));
 
+  arena.clear();
   // volkLoadDevice(device);
   return device;
 }
