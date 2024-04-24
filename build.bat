@@ -14,7 +14,6 @@ if "%~1"==""        echo [default mode] && (
 
 if "%all%" == "1" (
     set glfw=1
-    set spdlog=1
     set imgui=1
     set adapter=1
     set main=1
@@ -35,12 +34,6 @@ pushd extra\glfw
 call %build_glfw%
 popd
 
-REM build spdlog
-set build_spdlog=
-if "%spdlog%"=="1" set build_spdlog= call build && echo [BUILDING spdlog]
-pushd extra\spdlog
-call %build_spdlog%
-popd
 
 REM build imgui
 set build_imgui=
@@ -86,7 +79,7 @@ set debug_links="shaderc_sharedd.lib"
 set release_links="shaderc_shared.lib"
 
 set compile_flags=
-set external_includes_dep= -external:I..\extra\imgui -external:I..\extra\glfw\include -external:I..\extra\spdlog\include -external:I..\extra\adapter -external:I%VULKAN_SDK%\Include -external:I..\extra\volk -external:I..\extra\glm -external:I..\extra\vma 
+set external_includes_dep= -external:I..\extra\imgui -external:I..\extra\glfw\include -external:I..\extra\adapter -external:I%VULKAN_SDK%\Include -external:I..\extra\volk -external:I..\extra\glm -external:I..\extra\vma 
 set include_deps= %external_includes_dep% -I..\mini\ 
 set common_flags= %include_deps% -nologo -MP -FC -Zi -Zc:__cplusplus -wd4530 -utf-8 -WX -W3 -external:W0 -EHsc
 REM -std:c++17
@@ -97,10 +90,9 @@ if "%release%"=="1" set compile_flags= %release_flags% %common_flags%
 set glfw_link= ..\extra\glfw\build\glfw.lib
 set imgui_link= ..\extra\imgui\build\imgui.lib
 set adapters_link= ..\extra\adapter\build\adapter.lib
-set spdlog_link = ..\extra\spdlog\build\spdlog.lib
 
 set win32_link=gdi32.lib kernel32.lib user32.lib Shell32.lib legacy_stdio_definitions.lib
-set common_links= -link -LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% %spdlog_link% vulkan-1.lib
+set common_links= -link -LIBPATH:%VULKAN_SDK%\lib %imgui_link% %glfw_link% %adapters_link% %win32_link% vulkan-1.lib
 
 set links=
 if "%debug%"=="1" set links= %common_links% %debug_links%
