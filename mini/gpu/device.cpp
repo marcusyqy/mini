@@ -7,8 +7,14 @@
 #include <cstring>
 
 #define DEBUG
+// #define VERBOSE_DEBUG 1
 
 // Check if there is debug.
+
+#if !defined(VERBOSE_DEBUG)
+#define VERBOSE_DEBUG 0
+#endif
+
 #if defined(DEBUG)
 #define VK_DEBUG 1
 #else
@@ -27,8 +33,11 @@ static constexpr const char* VK_REQUIRED_EXTENSIONS[] = {
   "VK_KHR_surface",
   GPU_PLATFORM_SURFACE,
 #if VK_DEBUG
+#if VERBOSE_DEBUG
   VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+#else
   VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
 #endif
 };
 
@@ -40,7 +49,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
   UNUSED_VAR(user_data);
 
   const char* prepend = nullptr;
-  if (type >= VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+  if(type >= VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) {
+    prepend = "DEVICE ADDRESS BINDING";
+  } else if (type >= VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
     prepend = "PERFORMANCE";
   } else if (type >= VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
     prepend = "VALIDATION";
@@ -63,16 +74,29 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 /// Not sure if this will be used?
 static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_report(
-    VkDebugReportFlagsEXT, // flags
-    VkDebugReportObjectTypeEXT object_type,
-    uint64_t,    // object
-    size_t,      // location
-    int32_t,     // message_code
-    const char*, // player_prefix
+    VkDebugReportFlagsEXT flags, 
+    VkDebugReportObjectTypeEXT, // object_type,
+    uint64_t, // object,
+    size_t, // location,
+    int32_t, //message_code,
+    const char* player_prefix,
     const char* message,
     void*) // user_data
 {
-  log_error("[vulkan] Debug report from ObjectType: %i\nMessage: %s\n", object_type, message);
+  // let's log this to somewhere else in the editor instead.
+  const char* prepend = nullptr;
+  static constexpr char validation_message[] = "<%s> :[vulkan] %s";
+  if(flags >= VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
+    log_debug(validation_message, player_prefix, message);
+  } else if(flags >= VK_DEBUG_REPORT_ERROR_BIT_EXT) {
+    log_error(validation_message, player_prefix, message);
+  } else if(flags >= VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
+    log_warn(validation_message, player_prefix, message);
+  } else if(flags >= VK_DEBUG_REPORT_WARNING_BIT_EXT) {
+    log_warn(validation_message, player_prefix, message);
+  } else if(flags >= VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
+    log_info(validation_message, player_prefix, message);
+  } 
   return VK_FALSE;
 }
 
@@ -101,8 +125,13 @@ static VkBool32
 // we probably need to wrap this somewhere
 static VkInstance instance                        = VK_NULL_HANDLE;
 static VkAllocationCallbacks* allocator_callbacks = nullptr; // can point to something meaningful.
-static VkDebugUtilsMessengerEXT debug_messenger   = VK_NULL_HANDLE;
+#if VK_DEBUG
+#if VERBOSE_DEBUG
 static VkDebugReportCallbackEXT debug_report      = VK_NULL_HANDLE;
+#else
+static VkDebugUtilsMessengerEXT debug_messenger   = VK_NULL_HANDLE;
+#endif
+#endif 
 static bool vk_debug_layers_present               = false;
 
 VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
@@ -172,8 +201,11 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
   create_info.ppEnabledLayerNames = validation_layers;
 
 #if VK_DEBUG
+#if VERBOSE_DEBUG
   instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+#else 
   instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+#endif
 #endif
 
   // Create Vulkan Instance
@@ -183,13 +215,26 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
 
 #if VK_DEBUG // need to check if there even contains the debug layers
   if (vk_debug_layers_present) {
+#if VERBOSE_DEBUG
+    VkDebugReportCallbackCreateInfoEXT debug_report_ci = {};
+    debug_report_ci.sType                              = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+    debug_report_ci.flags = VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT;
+    debug_report_ci.pfnCallback = vk_debug_report;
+    debug_report_ci.pUserData   = nullptr;
+
+    // Setup the debug report callback
+    auto vkCreateDebugReportCallbackEXT =
+        (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    assert(vkCreateDebugReportCallbackEXT);
+    VK_CHECK(vkCreateDebugReportCallbackEXT(instance, &debug_report_ci, allocator_callbacks, &debug_report));
+#else
     VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = {};
     debug_messenger_create_info.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     debug_messenger_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     debug_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
     debug_messenger_create_info.pfnUserCallback = &vk_debug_callback;
     debug_messenger_create_info.pUserData       = nullptr; // Optional
 
@@ -198,19 +243,7 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
     assert(vkCreateDebugUtilsMessengerEXT);
     VK_CHECK(
         vkCreateDebugUtilsMessengerEXT(instance, &debug_messenger_create_info, allocator_callbacks, &debug_messenger));
-
-    // Setup the debug report callback
-    auto vkCreateDebugReportCallbackEXT =
-        (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-    assert(vkCreateDebugReportCallbackEXT);
-
-    VkDebugReportCallbackCreateInfoEXT debug_report_ci = {};
-    debug_report_ci.sType                              = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    debug_report_ci.flags =
-        VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-    debug_report_ci.pfnCallback = vk_debug_report;
-    debug_report_ci.pUserData   = nullptr;
-    VK_CHECK(vkCreateDebugReportCallbackEXT(instance, &debug_report_ci, allocator_callbacks, &debug_report));
+#endif
   } else {
     log_error("Debug layers not present for vulkan even though DEBUG is true!");
   }
@@ -224,15 +257,17 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
 
 void cleanup_gpu_instance() {
 #if VK_DEBUG
-  auto vkDestroyDebugUtilsMessengerEXT =
-      (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-  assert(vkDestroyDebugUtilsMessengerEXT);
-  vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, allocator_callbacks);
-
+#if VERBOSE_DEBUG
   auto vkDestroyDebugReportCallbackEXT =
       (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
   assert(vkDestroyDebugReportCallbackEXT);
   vkDestroyDebugReportCallbackEXT(instance, debug_report, allocator_callbacks);
+#else
+  auto vkDestroyDebugUtilsMessengerEXT =
+      (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+  assert(vkDestroyDebugUtilsMessengerEXT);
+  vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, allocator_callbacks);
+#endif
 #endif
   vkDestroyInstance(instance, allocator_callbacks);
   // volkFinalize();
