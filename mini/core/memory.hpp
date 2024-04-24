@@ -57,17 +57,11 @@ public:
   }
 };
 
-enum struct Allocation_Op { 
-  alloc, 
-  resize, 
-  free, 
-  alloc_no_zero,
-  resize_no_zero 
-};
+enum struct Allocation_Op { alloc, resize, free, alloc_no_zero, resize_no_zero };
 
 enum struct Allocation_Err {
   none = 0,
-  out_of_bounds,    // for realloc & free
+  out_of_bounds, // for realloc & free
   out_of_memory,
 };
 

@@ -37,7 +37,7 @@ void default_allocator_proc(Allocation_Parameters* params, Allocation_Result* re
 Allocation_Result Allocator::allocate(u64 size, u64 alignment) {
   assert(alloc_proc);
   Allocation_Parameters params = {};
-  params.op     = Allocation_Op::alloc;
+  params.op                    = Allocation_Op::alloc;
   params.user_ptr              = user_ptr;
   params.size                  = size;
   params.alignment             = alignment;
@@ -50,7 +50,7 @@ Allocation_Result Allocator::allocate(u64 size, u64 alignment) {
 Allocation_Result Allocator::allocate_no_zero(u64 size, u64 alignment) {
   assert(alloc_proc);
   Allocation_Parameters params = {};
-  params.op     = Allocation_Op::alloc_no_zero;
+  params.op                    = Allocation_Op::alloc_no_zero;
   params.user_ptr              = user_ptr;
   params.size                  = size;
   params.alignment             = alignment;
@@ -63,7 +63,7 @@ Allocation_Result Allocator::allocate_no_zero(u64 size, u64 alignment) {
 Allocation_Err Allocator::free(void* memory) {
   assert(alloc_proc);
   Allocation_Parameters params = {};
-  params.op     = Allocation_Op::free;
+  params.op                    = Allocation_Op::free;
   params.user_ptr              = user_ptr;
   params.memory                = memory;
 
@@ -75,7 +75,7 @@ Allocation_Err Allocator::free(void* memory) {
 Allocation_Result Allocator::realloc(void* memory, u64 size, u64 alignment, u64 old_size) {
   assert(alloc_proc);
   Allocation_Parameters params = {};
-  params.op     = Allocation_Op::alloc_no_zero;
+  params.op                    = Allocation_Op::alloc_no_zero;
   params.user_ptr              = user_ptr;
   params.memory                = memory;
   params.size                  = size;
@@ -90,7 +90,7 @@ Allocation_Result Allocator::realloc(void* memory, u64 size, u64 alignment, u64 
 Allocation_Result Allocator::realloc_no_zero(void* memory, u64 size, u64 alignment, u64 old_size) {
   assert(alloc_proc);
   Allocation_Parameters params = {};
-  params.op     = Allocation_Op::alloc_no_zero;
+  params.op                    = Allocation_Op::alloc_no_zero;
   params.user_ptr              = user_ptr;
   params.memory                = memory;
   params.size                  = size;

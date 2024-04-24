@@ -7,7 +7,6 @@
 #include "defs.hpp"
 #include "vma/vk_mem_alloc.h"
 
-
 // forward declare
 struct GLFWwindow;
 

@@ -181,14 +181,20 @@ static void create_or_reinitialize_swapchain(Temp_Linear_Allocator arena, Device
     image_view_create_info.subresourceRange.layerCount     = 1;
 
     // create image view
-    VK_CHECK(vkCreateImageView(device->logical, &image_view_create_info, device->allocator_callbacks, surface->image_views + i));
+    VK_CHECK(vkCreateImageView(
+        device->logical,
+        &image_view_create_info,
+        device->allocator_callbacks,
+        surface->image_views + i));
 
     // create semaphore
     VkSemaphoreCreateInfo semaphore_info{};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VK_CHECK(vkCreateSemaphore(device->logical, &semaphore_info, device->allocator_callbacks, surface->image_avail + i));
-    VK_CHECK(vkCreateSemaphore(device->logical, &semaphore_info, device->allocator_callbacks, surface->render_done + i));
+    VK_CHECK(
+        vkCreateSemaphore(device->logical, &semaphore_info, device->allocator_callbacks, surface->image_avail + i));
+    VK_CHECK(
+        vkCreateSemaphore(device->logical, &semaphore_info, device->allocator_callbacks, surface->render_done + i));
   }
 
   // swapchain_acquire_next_image(swapchain);

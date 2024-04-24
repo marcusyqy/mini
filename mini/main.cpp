@@ -19,8 +19,8 @@
 
 #include "embed/color.frag"
 #include "embed/color.vert"
-#include <cstdio>
 #include "glm.hpp"
+#include <cstdio>
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
@@ -166,10 +166,10 @@ static void transition_image(
 }
 
 struct Compute_Push_Constants {
-	glm::vec4 data1;
-	glm::vec4 data2;
-	glm::vec4 data3;
-	glm::vec4 data4;
+  glm::vec4 data1;
+  glm::vec4 data2;
+  glm::vec4 data3;
+  glm::vec4 data4;
 };
 
 int main(int, char**) {
@@ -236,8 +236,7 @@ int main(int, char**) {
   log_debug("debug");
   log_warn("warn");
 
-
-  char* gradient_comp_shader_buffer    = nullptr;
+  char* gradient_comp_shader_buffer = nullptr;
   u64 gradient_comp_buffer_size = read_file(temp_allocator, &gradient_comp_shader_buffer, "kernel/gradient.comp.spv");
   assert(gradient_comp_shader_buffer != 0);
 
@@ -248,13 +247,16 @@ int main(int, char**) {
   gradient_shader_create_info.pCode                    = (u32*)gradient_comp_shader_buffer;
 
   VkShaderModule gradient_comp_shader_module = { 0 };
-  VK_CHECK(
-      vkCreateShaderModule(device.logical, &gradient_shader_create_info, device.allocator_callbacks, &gradient_comp_shader_module));
+  VK_CHECK(vkCreateShaderModule(
+      device.logical,
+      &gradient_shader_create_info,
+      device.allocator_callbacks,
+      &gradient_comp_shader_module));
   defer { vkDestroyShaderModule(device.logical, gradient_comp_shader_module, device.allocator_callbacks); };
   temp_allocator.clear();
 
-  char* sky_comp_shader_buffer    = nullptr;
-  u64 sky_comp_buffer_size = read_file(temp_allocator, &sky_comp_shader_buffer, "kernel/sky.comp.spv");
+  char* sky_comp_shader_buffer = nullptr;
+  u64 sky_comp_buffer_size     = read_file(temp_allocator, &sky_comp_shader_buffer, "kernel/sky.comp.spv");
   assert(sky_comp_shader_buffer != 0);
 
   VkShaderModuleCreateInfo sky_shader_create_info = {};
@@ -264,12 +266,14 @@ int main(int, char**) {
   sky_shader_create_info.pCode                    = (u32*)sky_comp_shader_buffer;
 
   VkShaderModule sky_comp_shader_module = { 0 };
-  VK_CHECK(
-      vkCreateShaderModule(device.logical, &sky_shader_create_info, device.allocator_callbacks, &sky_comp_shader_module));
+  VK_CHECK(vkCreateShaderModule(
+      device.logical,
+      &sky_shader_create_info,
+      device.allocator_callbacks,
+      &sky_comp_shader_module));
   defer { vkDestroyShaderModule(device.logical, sky_comp_shader_module, device.allocator_callbacks); };
 
   temp_allocator.clear();
-
 
   const u32 num_bindings = 1;
   VkDescriptorSetLayoutBinding binding[num_bindings];
@@ -334,18 +338,17 @@ int main(int, char**) {
   compute_layout_create_info.setLayoutCount = 1;
 
   VkPushConstantRange push_constant_range{};
-  push_constant_range.offset = 0;
-  push_constant_range.size = sizeof(Compute_Push_Constants) ;
+  push_constant_range.offset     = 0;
+  push_constant_range.size       = sizeof(Compute_Push_Constants);
   push_constant_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-  compute_layout_create_info.pPushConstantRanges = &push_constant_range;
+  compute_layout_create_info.pPushConstantRanges    = &push_constant_range;
   compute_layout_create_info.pushConstantRangeCount = 1;
 
   VkPipelineLayout compute_layout;
   VK_CHECK(
       vkCreatePipelineLayout(device.logical, &compute_layout_create_info, device.allocator_callbacks, &compute_layout));
   defer { vkDestroyPipelineLayout(device.logical, compute_layout, device.allocator_callbacks); };
-
 
   VkPipelineShaderStageCreateInfo gradient_pipeline_stage_info{};
   gradient_pipeline_stage_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -400,19 +403,18 @@ int main(int, char**) {
     Compute_Push_Constants data;
   } background_effects[2];
 
-  background_effects[0].layout = compute_layout;
-  background_effects[0].pipeline = gradient_compute_pipeline;
-  background_effects[0].name = "Gradient";
-  background_effects[0].data = {};
+  background_effects[0].layout     = compute_layout;
+  background_effects[0].pipeline   = gradient_compute_pipeline;
+  background_effects[0].name       = "Gradient";
+  background_effects[0].data       = {};
   background_effects[0].data.data1 = glm::vec4(1, 0, 0, 1);
   background_effects[0].data.data2 = glm::vec4(0, 0, 1, 1);
 
-
-  background_effects[1].layout = compute_layout;
-  background_effects[1].pipeline = sky_compute_pipeline;
-  background_effects[1].name = "Sky";
-  background_effects[1].data = {};
-  background_effects[1].data.data1 = glm::vec4(0.1, 0.2, 0.4 ,0.97);
+  background_effects[1].layout     = compute_layout;
+  background_effects[1].pipeline   = sky_compute_pipeline;
+  background_effects[1].name       = "Sky";
+  background_effects[1].data       = {};
+  background_effects[1].data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
 
   struct Frame_Data {
     VkCommandPool command_pool;
@@ -557,24 +559,23 @@ int main(int, char**) {
 
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to
     // learn more about Dear ImGui!).
-    static bool show_demo_window    = true;
+    static bool show_demo_window = true;
     if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
 
     static bool show_metric_window = true;
     if (show_metric_window) ImGui::ShowMetricsWindow(&show_metric_window);
 
-		
-    static bool show_background_window = true;
+    static bool show_background_window   = true;
     static int current_background_effect = 0;
-		if (show_background_window && ImGui::Begin("background", &show_background_window)) {
-			Compute_Effect& selected = background_effects[current_background_effect];
-			ImGui::Text("Selected effect: %s", selected.name);
-			ImGui::SliderInt("Effect Index", &current_background_effect, 0, ARRAY_SIZE(background_effects) - 1);
-			ImGui::SliderFloat4("data1",(float*)& selected.data.data1, 0.0, 1.0);
-			ImGui::SliderFloat4("data2",(float*)& selected.data.data2, 0.0, 1.0);
-			ImGui::SliderFloat4("data3",(float*)& selected.data.data3, 0.0, 1.0);
-			ImGui::SliderFloat4("data4",(float*)& selected.data.data4, 0.0, 1.0);
-		}
+    if (show_background_window && ImGui::Begin("background", &show_background_window)) {
+      Compute_Effect& selected = background_effects[current_background_effect];
+      ImGui::Text("Selected effect: %s", selected.name);
+      ImGui::SliderInt("Effect Index", &current_background_effect, 0, ARRAY_SIZE(background_effects) - 1);
+      ImGui::SliderFloat4("data1", (float*)&selected.data.data1, 0.0, 1.0);
+      ImGui::SliderFloat4("data2", (float*)&selected.data.data2, 0.0, 1.0);
+      ImGui::SliderFloat4("data3", (float*)&selected.data.data3, 0.0, 1.0);
+      ImGui::SliderFloat4("data4", (float*)&selected.data.data4, 0.0, 1.0);
+    }
     ImGui::End();
 
     ImGui::Render();
@@ -610,7 +611,10 @@ int main(int, char**) {
         VK_IMAGE_LAYOUT_GENERAL);
 
     auto& selected_background_effect = background_effects[current_background_effect];
-    vkCmdBindPipeline(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, selected_background_effect.pipeline);
+    vkCmdBindPipeline(
+        current_frame.command_buffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        selected_background_effect.pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
 
@@ -628,7 +632,13 @@ int main(int, char**) {
     // pc.data1 = glm::vec4(1, 0, 0, 1);
     // pc.data2 = glm::vec4(0, 0, 1, 1);
 
-    vkCmdPushConstants(current_frame.command_buffer, selected_background_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Compute_Push_Constants), &selected_background_effect.data);
+    vkCmdPushConstants(
+        current_frame.command_buffer,
+        selected_background_effect.layout,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        0,
+        sizeof(Compute_Push_Constants),
+        &selected_background_effect.data);
 
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
     vkCmdDispatch(

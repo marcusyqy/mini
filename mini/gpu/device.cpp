@@ -261,7 +261,7 @@ Device create_device(Temp_Linear_Allocator arena) {
   for (u32 i = 0; i < gpu_count; ++i) {
     // should save stack here. or create a temporary scratch arena. not sure...
     /// @TODO: revisit this.
-    defer {scratch.clear();};
+    defer { scratch.clear(); };
     VkPhysicalDeviceProperties properties;
     vkGetPhysicalDeviceProperties(gpus[i], &properties);
     if (properties.apiVersion < required_version) continue;

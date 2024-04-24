@@ -16,14 +16,14 @@ enum struct GPU_Resource_Type {
 /// This struct may be too huge right now? we can probably reduce it more.
 /// This instance is always the same and the ... are always the same.
 struct Delay_Info {
-  void* resource_ptr = nullptr;
-  VkInstance instance = VK_NULL_HANDLE;
-  VkDevice device = VK_NULL_HANDLE;
-  VmaAllocator allocator = VK_NULL_HANDLE;
+  void* resource_ptr                               = nullptr;
+  VkInstance instance                              = VK_NULL_HANDLE;
+  VkDevice device                                  = VK_NULL_HANDLE;
+  VmaAllocator allocator                           = VK_NULL_HANDLE;
   const VkAllocationCallbacks* allocator_callbacks = nullptr;
   // probably shouldn't be accessed by the user?
-  Delay_Info* next; 
-  Delay_Info* prev; 
+  Delay_Info* next;
+  Delay_Info* prev;
   GPU_Resource_Type resource_type;
   u32 pad;
 };
@@ -42,7 +42,7 @@ struct Delay_Queue {
 
 private:
   Delay_Info* push_generic();
-  
-  Delay_Info* head = nullptr;
+
+  Delay_Info* head    = nullptr;
   Delay_Info* storage = nullptr;
 };
