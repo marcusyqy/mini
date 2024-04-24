@@ -5,6 +5,6 @@
 
 void VK_CHECK(VkResult err) {
   if (err == VK_SUCCESS) return;
-  log_error("[vulkan] Error: VkResult = %d", string_VkResult(err));
+  log_error("[vulkan] Error: VkResult = %s", string_VkResult(err));
   assert(err < 0);
 }
