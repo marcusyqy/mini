@@ -8,4 +8,5 @@ set COMPILER= %VULKAN_SDK%\Bin\glslangValidator.exe
 if not exist build mkdir build
 pushd build
 %COMPILER% -V ..\gradient.comp -o gradient.comp.spv
+%COMPILER% -V ..\sky.comp -o sky.comp.spv
 popd

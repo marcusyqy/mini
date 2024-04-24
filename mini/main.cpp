@@ -20,6 +20,7 @@
 #include "embed/color.frag"
 #include "embed/color.vert"
 #include <cstdio>
+#include "glm.hpp"
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
@@ -30,7 +31,6 @@ static void begin_command(VkCommandBuffer command_buffer, VkCommandBufferUsageFl
   command_buffer_begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   command_buffer_begin_info.flags                    = flags;
   command_buffer_begin_info.pInheritanceInfo         = nullptr;
-
   VK_CHECK(vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info));
 }
 
@@ -51,6 +51,7 @@ static VkCommandBuffer allocate_command_buffer(Device* device, VkCommandPool com
   command_buffer_allocate_info.commandPool                 = command_pool;
   command_buffer_allocate_info.level = primary ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;
   command_buffer_allocate_info.commandBufferCount = 1;
+
   VkCommandBuffer command_buffer;
   VK_CHECK(vkAllocateCommandBuffers(device->logical, &command_buffer_allocate_info, &command_buffer));
   return command_buffer;
@@ -61,6 +62,7 @@ static VkFence create_fence(Device* device, bool should_signal) {
   fence_create_info.sType             = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fence_create_info.pNext             = nullptr;
   fence_create_info.flags             = should_signal ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
+
   VkFence fence;
   VK_CHECK(vkCreateFence(device->logical, &fence_create_info, device->allocator_callbacks, &fence));
   return fence;
@@ -163,6 +165,13 @@ static void transition_image(
   vkCmdPipelineBarrier2(command_buffer, &dependency_info);
 }
 
+struct Compute_Push_Constants {
+	glm::vec4 data1;
+	glm::vec4 data2;
+	glm::vec4 data3;
+	glm::vec4 data4;
+};
+
 int main(int, char**) {
   log_info("Hello world from %s!!", "Mini Engine");
 
@@ -231,22 +240,39 @@ int main(int, char**) {
   bool show_another_window = false;
   ImVec4 clear_color       = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-  char* buffer    = nullptr;
-  u64 buffer_size = read_file(temp_allocator, &buffer, "kernel/gradient.comp.spv");
-  assert(buffer_size != 0);
+  char* gradient_comp_shader_buffer    = nullptr;
+  u64 gradient_comp_buffer_size = read_file(temp_allocator, &gradient_comp_shader_buffer, "kernel/gradient.comp.spv");
+  assert(gradient_comp_shader_buffer != 0);
 
-  VkShaderModuleCreateInfo comp_shader_create_info = {};
-  comp_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  comp_shader_create_info.pNext                    = nullptr;
-  comp_shader_create_info.codeSize                 = buffer_size;
-  comp_shader_create_info.pCode                    = (u32*)buffer;
+  VkShaderModuleCreateInfo gradient_shader_create_info = {};
+  gradient_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  gradient_shader_create_info.pNext                    = nullptr;
+  gradient_shader_create_info.codeSize                 = gradient_comp_buffer_size;
+  gradient_shader_create_info.pCode                    = (u32*)gradient_comp_shader_buffer;
 
-  VkShaderModule comp_shader_module = { 0 };
+  VkShaderModule gradient_comp_shader_module = { 0 };
   VK_CHECK(
-      vkCreateShaderModule(device.logical, &comp_shader_create_info, device.allocator_callbacks, &comp_shader_module));
-  defer { vkDestroyShaderModule(device.logical, comp_shader_module, device.allocator_callbacks); };
+      vkCreateShaderModule(device.logical, &gradient_shader_create_info, device.allocator_callbacks, &gradient_comp_shader_module));
+  defer { vkDestroyShaderModule(device.logical, gradient_comp_shader_module, device.allocator_callbacks); };
+  temp_allocator.clear();
+
+  char* sky_comp_shader_buffer    = nullptr;
+  u64 sky_comp_buffer_size = read_file(temp_allocator, &sky_comp_shader_buffer, "kernel/sky.comp.spv");
+  assert(sky_comp_shader_buffer != 0);
+
+  VkShaderModuleCreateInfo sky_shader_create_info = {};
+  sky_shader_create_info.sType                    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  sky_shader_create_info.pNext                    = nullptr;
+  sky_shader_create_info.codeSize                 = sky_comp_buffer_size;
+  sky_shader_create_info.pCode                    = (u32*)sky_comp_shader_buffer;
+
+  VkShaderModule sky_comp_shader_module = { 0 };
+  VK_CHECK(
+      vkCreateShaderModule(device.logical, &sky_shader_create_info, device.allocator_callbacks, &sky_comp_shader_module));
+  defer { vkDestroyShaderModule(device.logical, sky_comp_shader_module, device.allocator_callbacks); };
 
   temp_allocator.clear();
+
 
   const u32 num_bindings = 1;
   VkDescriptorSetLayoutBinding binding[num_bindings];
@@ -310,33 +336,86 @@ int main(int, char**) {
   compute_layout_create_info.pSetLayouts    = &layout;
   compute_layout_create_info.setLayoutCount = 1;
 
+  VkPushConstantRange push_constant_range{};
+  push_constant_range.offset = 0;
+  push_constant_range.size = sizeof(Compute_Push_Constants) ;
+  push_constant_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+  compute_layout_create_info.pPushConstantRanges = &push_constant_range;
+  compute_layout_create_info.pushConstantRangeCount = 1;
+
   VkPipelineLayout compute_layout;
   VK_CHECK(
       vkCreatePipelineLayout(device.logical, &compute_layout_create_info, device.allocator_callbacks, &compute_layout));
   defer { vkDestroyPipelineLayout(device.logical, compute_layout, device.allocator_callbacks); };
 
-  VkPipelineShaderStageCreateInfo pipeline_stage_info{};
-  pipeline_stage_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  pipeline_stage_info.pNext  = nullptr;
-  pipeline_stage_info.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
-  pipeline_stage_info.module = comp_shader_module;
-  pipeline_stage_info.pName  = "main";
 
-  VkComputePipelineCreateInfo compute_pipeline_create_info{};
-  compute_pipeline_create_info.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  compute_pipeline_create_info.pNext  = nullptr;
-  compute_pipeline_create_info.layout = compute_layout;
-  compute_pipeline_create_info.stage  = pipeline_stage_info;
+  VkPipelineShaderStageCreateInfo gradient_pipeline_stage_info{};
+  gradient_pipeline_stage_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  gradient_pipeline_stage_info.pNext  = nullptr;
+  gradient_pipeline_stage_info.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+  gradient_pipeline_stage_info.module = gradient_comp_shader_module;
+  gradient_pipeline_stage_info.pName  = "main";
 
-  VkPipeline compute_pipeline;
+  VkComputePipelineCreateInfo gradient_compute_pipeline_create_info{};
+  gradient_compute_pipeline_create_info.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  gradient_compute_pipeline_create_info.pNext  = nullptr;
+  gradient_compute_pipeline_create_info.layout = compute_layout;
+  gradient_compute_pipeline_create_info.stage  = gradient_pipeline_stage_info;
+
+  VkPipeline gradient_compute_pipeline;
   VK_CHECK(vkCreateComputePipelines(
       device.logical,
       VK_NULL_HANDLE,
       1,
-      &compute_pipeline_create_info,
+      &gradient_compute_pipeline_create_info,
       nullptr,
-      &compute_pipeline));
-  defer { vkDestroyPipeline(device.logical, compute_pipeline, device.allocator_callbacks); };
+      &gradient_compute_pipeline));
+  defer { vkDestroyPipeline(device.logical, gradient_compute_pipeline, device.allocator_callbacks); };
+
+  VkPipelineShaderStageCreateInfo sky_pipeline_stage_info{};
+  sky_pipeline_stage_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  sky_pipeline_stage_info.pNext  = nullptr;
+  sky_pipeline_stage_info.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+  sky_pipeline_stage_info.module = sky_comp_shader_module;
+  sky_pipeline_stage_info.pName  = "main";
+
+  VkComputePipelineCreateInfo sky_compute_pipeline_create_info{};
+  sky_compute_pipeline_create_info.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  sky_compute_pipeline_create_info.pNext  = nullptr;
+  sky_compute_pipeline_create_info.layout = compute_layout;
+  sky_compute_pipeline_create_info.stage  = sky_pipeline_stage_info;
+
+  VkPipeline sky_compute_pipeline;
+  VK_CHECK(vkCreateComputePipelines(
+      device.logical,
+      VK_NULL_HANDLE,
+      1,
+      &sky_compute_pipeline_create_info,
+      nullptr,
+      &sky_compute_pipeline));
+  defer { vkDestroyPipeline(device.logical, sky_compute_pipeline, device.allocator_callbacks); };
+
+  struct Compute_Effect {
+    const char* name;
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    Compute_Push_Constants data;
+  } background_effects[2];
+
+  background_effects[0].layout = compute_layout;
+  background_effects[0].pipeline = gradient_compute_pipeline;
+  background_effects[0].name = "Gradient";
+  background_effects[0].data = {};
+  background_effects[0].data.data1 = glm::vec4(1, 0, 0, 1);
+  background_effects[0].data.data2 = glm::vec4(0, 0, 1, 1);
+
+
+  background_effects[1].layout = compute_layout;
+  background_effects[1].pipeline = sky_compute_pipeline;
+  background_effects[1].name = "Sky";
+  background_effects[1].data = {};
+  background_effects[1].data.data1 = glm::vec4(0.1, 0.2, 0.4 ,0.97);
 
   struct Frame_Data {
     VkCommandPool command_pool;
@@ -514,6 +593,21 @@ int main(int, char**) {
       if (ImGui::Button("Close Me")) show_another_window = false;
       ImGui::End();
     }
+
+		
+    static int current_background_effect = 0;
+		if (ImGui::Begin("background")) {
+			Compute_Effect& selected = background_effects[current_background_effect];
+			ImGui::Text("Selected effect: %s", selected.name);
+			ImGui::SliderInt("Effect Index", &current_background_effect, 0, ARRAY_SIZE(background_effects) - 1);
+			ImGui::SliderFloat4("data1",(float*)& selected.data.data1, 0.0, 1.0);
+			ImGui::SliderFloat4("data2",(float*)& selected.data.data2, 0.0, 1.0);
+			ImGui::SliderFloat4("data3",(float*)& selected.data.data3, 0.0, 1.0);
+			ImGui::SliderFloat4("data4",(float*)& selected.data.data4, 0.0, 1.0);
+		
+			ImGui::End();
+		}
+
     ImGui::Render();
 
     auto main_draw_data          = ImGui::GetDrawData();
@@ -546,18 +640,25 @@ int main(int, char**) {
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL);
 
-    vkCmdBindPipeline(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
+    auto& selected_background_effect = background_effects[current_background_effect];
+    vkCmdBindPipeline(current_frame.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, selected_background_effect.pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
     vkCmdBindDescriptorSets(
         current_frame.command_buffer,
         VK_PIPELINE_BIND_POINT_COMPUTE,
-        compute_layout,
+        selected_background_effect.layout,
         0,
         1,
         &current_frame.set,
         0,
         nullptr);
+
+    // Compute_Push_Constants pc;
+    // pc.data1 = glm::vec4(1, 0, 0, 1);
+    // pc.data2 = glm::vec4(0, 0, 1, 1);
+
+    vkCmdPushConstants(current_frame.command_buffer, selected_background_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Compute_Push_Constants), &selected_background_effect.data);
 
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
     vkCmdDispatch(
