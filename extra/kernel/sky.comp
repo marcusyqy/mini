@@ -36,17 +36,17 @@ float stable_star_field(in vec2 sample_pos, float threshold) {
   // There must be a better way to "anti alias" the star field.
   float fract_x = fract(sample_pos.x);
   float fract_y = fract(sample_pos.y);
-  vec2 floor_sample = floor(sample_pos);    
+  vec2 floor_sample = floor(sample_pos);
   float v1 = noisy_star_field(floor_sample, threshold);
   float v2 = noisy_star_field(floor_sample + vec2(0.0, 1.0), threshold);
   float v3 = noisy_star_field(floor_sample + vec2(1.0, 0.0), threshold);
   float v4 = noisy_star_field(floor_sample + vec2(1.0, 1.0), threshold);
 
   float star_val =  v1 * (1.0 - fract_x) * (1.0 - fract_y)
-            + v2 * (1.0 - fract_x) * fract_y
-            + v3 * fract_x * (1.0 - fract_y)
-            + v4 * fract_x * fract_y;
-	return star_val;
+    + v2 * (1.0 - fract_x) * fract_y
+    + v3 * fract_x * (1.0 - fract_y)
+    + v4 * fract_x * fract_y;
+  return star_val;
 }
 
 void main_image(out vec4 frag_color, in vec2 frag_coord, in vec2 resolution) {
@@ -62,20 +62,20 @@ void main_image(out vec4 frag_color, in vec2 frag_coord, in vec2 resolution) {
   float xrate = 0.2;
   float yrate = -0.06;
   vec2 sample_pos = frag_coord.xy + vec2(xrate * float(1), yrate * float(1));
-	float star_val = stable_star_field(sample_pos, star_field_threshold);
+  float star_val = stable_star_field(sample_pos, star_field_threshold);
   color += vec3(star_val);
-	frag_color = vec4(color, 1.0);
+  frag_color = vec4(color, 1.0);
 }
 
 
 
 void main() {
-	vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
+  vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
   ivec2 texel_coord = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 size = imageSize(image);
+  ivec2 size = imageSize(image);
   if(texel_coord.x < size.x && texel_coord.y < size.y) {
     vec4 color;
     main_image(color, texel_coord, size);
     imageStore(image, texel_coord, color);
-  }   
+  }
 }
