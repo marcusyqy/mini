@@ -2,16 +2,17 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
+#include <time.h>
 
 namespace helper {
 char buffer[1024];
 
 static const char* to_level_string(Log_Level level) {
   switch (level) {
-    case Log_Level::info: return "INFO";
-    case Log_Level::warn: return "WARN";
-    case Log_Level::debug: return "DEBUG";
-    case Log_Level::error: return "ERROR";
+    case Log_Level::info: return "info";
+    case Log_Level::warn: return "warn";
+    case Log_Level::debug: return "debug";
+    case Log_Level::error: return "error";
   }
   return "UNKNOWN_LEVEL";
 }
@@ -55,9 +56,20 @@ void console_log_print_line(Log_Level level, const char* message, ...) {
   assert(value >= 0 && value < sizeof(helper::buffer));
 #define RESET_COLOR_IN_CONSOLE "\x1B[0m"
   // @TODO: add time here as well?
+  // GetSystemTimeAsFileTime
+  time_t rawtime;
+  struct tm timeinfo;
+  time(&rawtime);
+  localtime_s(&timeinfo, &rawtime);
   fprintf(
       stdout,
-      "%s[%s]: %s\n" RESET_COLOR_IN_CONSOLE,
+      "[%04d-%02d-%02d %02d:%02d:%02d] [%s%s" RESET_COLOR_IN_CONSOLE "] %s\n",
+      timeinfo.tm_year + 1900,  
+      timeinfo.tm_mon, 
+      timeinfo.tm_mday, 
+      timeinfo.tm_hour,  
+      timeinfo.tm_min,   
+      timeinfo.tm_sec,   
       helper::to_color(level),
       helper::to_level_string(level),
       helper::buffer);
