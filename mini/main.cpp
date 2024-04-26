@@ -576,8 +576,8 @@ int main(int, char**) {
       ImGui::SliderFloat4("data2", (float*)&selected.data.data2, 0.0, 1.0);
       ImGui::SliderFloat4("data3", (float*)&selected.data.data3, 0.0, 1.0);
       ImGui::SliderFloat4("data4", (float*)&selected.data.data4, 0.0, 1.0);
+      ImGui::End();
     }
-    ImGui::End();
 
     ImGui::Render();
 
