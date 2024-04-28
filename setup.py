@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 
-# possible TODO is to make this also run the bat file? 
+# possible TODO is to make this also run the bat file?
 import os, sys
 from extra import Vulkan_Installer
 
-includes = [ 
-  "mini", 
-  "extra/imgui", 
-  "extra/glfw/include", 
-  "extra/adapter", 
-  "extra/volk", 
-  "extra/glm", 
-  "extra/vma", 
-  "extra/spdlog/include", 
+includes = [
+  "mini",
+  "extra/imgui",
+  "extra/glfw/include",
+  "extra/adapter",
+  "extra/volk",
+  "extra/glm",
+  "extra/vma",
+  "extra/spdlog/include",
 ]
 
 def download_vulkan_if_not_available():
@@ -49,7 +49,7 @@ def generate_compile_commands():
 def need_setup():
   setup_py = "setup.py"
   compile_flags = "compile_flags.txt"
-  return not os.path.exists(compile_flags) or os.path.getmtime(setup_py) > os.path.getmtime(compile_flags) 
+  return not os.path.exists(compile_flags) or os.path.getmtime(setup_py) > os.path.getmtime(compile_flags)
 
 if __name__ == "__main__":
   assert sys.platform == 'win32', "CURRENTLY MINI DOESN'T SUPPORT NON WINDOWS BUILD."

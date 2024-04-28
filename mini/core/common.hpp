@@ -36,3 +36,8 @@ struct Time {
   u32 second;
   u32 milli_second;
 };
+
+
+u64 hash_sdbm(const char* str);
+u64 hash_djb2(const char* str);
+

@@ -49,7 +49,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
   UNUSED_VAR(user_data);
 
   const char* prepend = nullptr;
-  if(type >= VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) {
+  if (type >= VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) {
     prepend = "DEVICE ADDRESS BINDING";
   } else if (type >= VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
     prepend = "PERFORMANCE";
@@ -74,29 +74,29 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 /// Not sure if this will be used?
 static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_report(
-    VkDebugReportFlagsEXT flags, 
+    VkDebugReportFlagsEXT flags,
     VkDebugReportObjectTypeEXT, // object_type,
-    uint64_t, // object,
-    size_t, // location,
-    int32_t, //message_code,
+    uint64_t,                   // object,
+    size_t,                     // location,
+    int32_t,                    // message_code,
     const char* player_prefix,
     const char* message,
     void*) // user_data
 {
   // let's log this to somewhere else in the editor instead.
-  const char* prepend = nullptr;
+  const char* prepend                        = nullptr;
   static constexpr char validation_message[] = "<%s> :[vulkan] %s";
-  if(flags >= VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
+  if (flags >= VK_DEBUG_REPORT_DEBUG_BIT_EXT) {
     log_debug(validation_message, player_prefix, message);
-  } else if(flags >= VK_DEBUG_REPORT_ERROR_BIT_EXT) {
+  } else if (flags >= VK_DEBUG_REPORT_ERROR_BIT_EXT) {
     log_error(validation_message, player_prefix, message);
-  } else if(flags >= VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
+  } else if (flags >= VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT) {
     log_warn(validation_message, player_prefix, message);
-  } else if(flags >= VK_DEBUG_REPORT_WARNING_BIT_EXT) {
+  } else if (flags >= VK_DEBUG_REPORT_WARNING_BIT_EXT) {
     log_warn(validation_message, player_prefix, message);
-  } else if(flags >= VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
+  } else if (flags >= VK_DEBUG_REPORT_INFORMATION_BIT_EXT) {
     log_info(validation_message, player_prefix, message);
-  } 
+  }
   return VK_FALSE;
 }
 
@@ -127,12 +127,12 @@ static VkInstance instance                        = VK_NULL_HANDLE;
 static VkAllocationCallbacks* allocator_callbacks = nullptr; // can point to something meaningful.
 #if VK_DEBUG
 #if VERBOSE_DEBUG
-static VkDebugReportCallbackEXT debug_report      = VK_NULL_HANDLE;
+static VkDebugReportCallbackEXT debug_report = VK_NULL_HANDLE;
 #else
-static VkDebugUtilsMessengerEXT debug_messenger   = VK_NULL_HANDLE;
+static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
 #endif
-#endif 
-static bool vk_debug_layers_present               = false;
+#endif
+static bool vk_debug_layers_present = false;
 
 VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
   VkApplicationInfo app_info  = {};
@@ -203,7 +203,7 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
 #if VK_DEBUG
 #if VERBOSE_DEBUG
   instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
-#else 
+#else
   instance_extensions[instance_extensions_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 #endif
 #endif
@@ -218,7 +218,8 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
 #if VERBOSE_DEBUG
     VkDebugReportCallbackCreateInfoEXT debug_report_ci = {};
     debug_report_ci.sType                              = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-    debug_report_ci.flags = VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT;
+    debug_report_ci.flags = VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT |
+        VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_DEBUG_BIT_EXT;
     debug_report_ci.pfnCallback = vk_debug_report;
     debug_report_ci.pUserData   = nullptr;
 
@@ -234,7 +235,8 @@ VkInstance init_gpu_instance(Temp_Linear_Allocator arena) {
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     debug_messenger_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
     debug_messenger_create_info.pfnUserCallback = &vk_debug_callback;
     debug_messenger_create_info.pUserData       = nullptr; // Optional
 

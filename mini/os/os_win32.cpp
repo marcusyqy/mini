@@ -1,5 +1,3 @@
-
-
 #if defined(_WIN32)
 #include "os_win32.hpp"
 #if 0
@@ -404,8 +402,7 @@ void execute() {
 
 #endif
 
-
-#if defined (_WIN32)
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include "os_win32.hpp"
 
@@ -420,23 +417,23 @@ Time os_get_current_local_time() {
 
 // --- win32 ---
 void win32_convert_time_to_system_time(const Time* time, SYSTEMTIME* system_time) {
-  system_time->wYear = time->year;
-  system_time->wMonth = time->month;
-  system_time->wDay = time->day;
-  system_time->wHour = time->hour;
-  system_time->wMinute = time->minute;
-  system_time->wSecond = time->second;
+  system_time->wYear         = time->year;
+  system_time->wMonth        = time->month;
+  system_time->wDay          = time->day;
+  system_time->wHour         = time->hour;
+  system_time->wMinute       = time->minute;
+  system_time->wSecond       = time->second;
   system_time->wMilliseconds = time->milli_second;
 }
 
 void win32_convert_system_time_to_time(const SYSTEMTIME* system_time, Time* time) {
-  time->year = system_time->wYear;
-  time->month = system_time->wMonth;
-  time->day= system_time->wDay;
-  time->hour = system_time->wHour;
-  time->minute = system_time->wMinute;
-  time->second = system_time->wSecond;
+  time->year         = system_time->wYear;
+  time->month        = system_time->wMonth;
+  time->day          = system_time->wDay;
+  time->hour         = system_time->wHour;
+  time->minute       = system_time->wMinute;
+  time->second       = system_time->wSecond;
   time->milli_second = system_time->wMilliseconds;
 }
 
-#endif 
+#endif

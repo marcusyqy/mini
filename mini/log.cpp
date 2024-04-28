@@ -1,8 +1,8 @@
 #include "log.hpp"
+#include "os/os_common.hpp"
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
-#include "os/os_common.hpp"
 
 namespace helper {
 char buffer[1024];
@@ -55,9 +55,9 @@ void console_log_print_line(Log_Level level, const char* message, ...) {
   int value = vsnprintf(helper::buffer, sizeof(helper::buffer), message, list);
   assert(value >= 0 && value < sizeof(helper::buffer));
 #define RESET_COLOR_IN_CONSOLE "\x1B[0m"
-  
+
   Time time = os_get_current_local_time();
-  if(time.hour > 12) time.hour -= 12;
+  if (time.hour > 12) time.hour -= 12;
   fprintf(
       stdout,
       "[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%s%s" RESET_COLOR_IN_CONSOLE "] %s\n",

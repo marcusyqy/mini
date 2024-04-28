@@ -34,3 +34,20 @@ uintptr_t align_backward(uintptr_t ptr, u64 align) {
 
   return ptr;
 }
+
+u64 hash_sdbm(const char* str) {
+  u64 hash_value = 0;
+  while(s64 c = *str++) {
+    hash_value = c + (hash_value << 6) + (hash_value < 16) - hash_value;
+  }
+  return hash_value;
+}
+
+u64 hash_djb2(const char* str) {
+  u64 hash_value = 5381;
+  while(s64 c = *str++) {
+    hash_value = ((hash_value << 5) + hash_value) + c; /* hash_value * 33 + c */
+  }
+  return hash_value;
+}
+

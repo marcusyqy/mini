@@ -19,8 +19,9 @@
 
 #include "embed/color.frag"
 #include "embed/color.vert"
-#include "glm.hpp"
+
 #include <cstdio>
+#include <glm.hpp>
 
 static void glfw_error_callback(int error, const char* description) {
   log_error("GLFW Error %d: %s", error, description);
@@ -144,9 +145,9 @@ static void transition_image(
   image_barrier.oldLayout = old_layout;
   image_barrier.newLayout = new_layout;
 
-  VkImageAspectFlags aspectMask     = (image_barrier.newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
-          ? VK_IMAGE_ASPECT_DEPTH_BIT
-          : VK_IMAGE_ASPECT_COLOR_BIT;
+  VkImageAspectFlags aspectMask = (image_barrier.newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+      ? VK_IMAGE_ASPECT_DEPTH_BIT
+      : VK_IMAGE_ASPECT_COLOR_BIT;
 
   VkImageSubresourceRange sub_image = {};
   sub_image.aspectMask              = aspectMask;
@@ -193,7 +194,7 @@ int main(int, char**) {
 
   if (!glfwVulkanSupported()) {
     log_error("GLFW: Vulkan not supported");
-    return 1;
+    return EXIT_FAILURE;
   }
 
   init_gpu_instance(temp_allocator);
@@ -217,7 +218,7 @@ int main(int, char**) {
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }
 
-  int w, h;
+  int w = -1, h = -1;
   glfwGetFramebufferSize(window, &w, &h);
 
   auto device = create_device(temp_allocator);
@@ -558,8 +559,8 @@ int main(int, char**) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to
-    // learn more about Dear ImGui!).
+    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code
+    // to learn more about Dear ImGui!).
     static bool show_demo_window = true;
     if (show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -628,11 +629,7 @@ int main(int, char**) {
         &current_frame.set,
         0,
         nullptr);
-
-    // Compute_Push_Constants pc;
-    // pc.data1 = glm::vec4(1, 0, 0, 1);
-    // pc.data2 = glm::vec4(0, 0, 1, 1);
-
+    
     vkCmdPushConstants(
         current_frame.command_buffer,
         selected_background_effect.layout,
@@ -777,5 +774,5 @@ int main(int, char**) {
   }
 
   vkDeviceWaitIdle(device.logical);
-  return 0;
+  return EXIT_SUCCESS;
 }

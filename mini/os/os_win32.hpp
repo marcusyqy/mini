@@ -48,8 +48,7 @@ int main(int argc, char** argv) {
 // @TODO: make a C++ counterpart for premake/cmake.
 #endif
 
-
-#if defined (_WIN32)
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include "core/common.hpp"
 #include <windows.h>
@@ -58,4 +57,3 @@ void win32_convert_time_to_system_time(const Time* time, SYSTEMTIME* system_time
 void win32_convert_system_time_to_time(const SYSTEMTIME* system_time, Time* time);
 
 #endif
-
